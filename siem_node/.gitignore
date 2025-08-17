@@ -1,0 +1,50 @@
+# Python bytecode and cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Environment and secrets
+.env
+.env.*
+*.env
+*.envrc
+
+# Logs and encrypted data
+logs/
+*.log
+*.enc
+*.aes
+*.tmp
+
+# Virtual environments
+venv/
+.env/
+env/
+*.egg-info/
+dist/
+build/
+
+# System-specific files
+.DS_Store
+Thumbs.db
+
+# IDE/editor configs
+.vscode/
+.idea/
+*.swp
+
+# Backup and archive
+*~
+*.bak
+archive/
+*.tar
+*.zip
+*.gz
+*.rar
+
+
+docs/
+
+commands.txt

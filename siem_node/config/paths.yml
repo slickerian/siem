@@ -1,0 +1,20 @@
+# Files to protect (used by tamper_protection.py)
+protected_files:
+  - main.py
+  - core/usb_monitor.py
+  - core/file_watcher.py
+  - core/command_monitor.py
+  - core/policy_engine.py
+  - core/logger.py
+
+# Directories/files to monitor (used by file_watcher.py)
+monitored_paths:
+  - /etc/passwd
+  - /etc/shadow
+  - /home
+  - /media
+  - /mnt
+  - /var/log
+
+white_list_files:
+  - /var/log/lightdm

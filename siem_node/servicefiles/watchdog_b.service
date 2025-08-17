@@ -1,0 +1,15 @@
+[Unit]
+Description=Siem Watchdog B
+After=network.target
+
+[Service]
+ExecStart=/home/mechanic/siem/venv/bin/python /home/mechanic/siem/utils/watchdog_b.py
+Environment="PATH=/home/mechanic/siem/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin"
+Environment="PYTHONPATH=/home/mechanic/siem/venv/lib/python3.12/site-packages"
+Restart=always
+RestartSec=3
+User=root
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

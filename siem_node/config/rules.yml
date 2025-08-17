@@ -1,0 +1,76 @@
+# Suspicious binaries (used by command_monitor.py)
+suspicious_binaries:
+  - nc
+  - ncat
+  - netcat
+  - socat
+  - scp
+  - ftp
+  - wget
+  - curl
+  - nmap
+  - shred
+  - dd
+  - base64
+  # Removed python3/perl to avoid flagging siem itself
+  # Add back only if you plan to explicitly whitelist safe processes
+
+# Safe processes to ignore (whitelist)
+safe_processes:
+  - /usr/lib/systemd
+  - dbus-daemon
+  - unattended-upgrade
+  - python3 main.py  # Prevent siem self-detection
+
+# Whitelisted USB devices (by serial number)
+whitelisted_usb_serials:
+  - "1234567890ABCDEF"
+  - "FEDCBA0987654321"
+
+
+
+# Event-based rules
+FILE_READ:
+  - field: pathname
+    value: "/etc/shadow"
+    comparison: equals
+    action: alert_admin
+
+  - field: pathname
+    value: "/etc/passwd"
+    comparison: equals
+    action: alert_admin
+
+FILE_DELETE:
+  - field: pathname
+    value: "/home/"
+    comparison: startswith
+    action: alert_admin
+
+SUSPICIOUS_COMMAND:
+  - field: binary
+    value: "nc"
+    comparison: equals
+    action: kill_process
+
+  - field: binary
+    value: "nmap"
+    comparison: equals
+    action: alert_admin
+
+  - field: cmdline
+    value: "wget"
+    comparison: contains
+    action: alert_admin
+
+TAMPER_REBOOT_SUSPECTED:
+  - field: uptime_seconds
+    value: 60  # Stored as a number now
+    comparison: less_than
+    action: trigger_investigation
+
+TAMPER_BACKGROUND_STOPPED:
+  - field: process_name
+    value: "main.py"
+    comparison: equals
+    action: alert_admin
