@@ -2,12 +2,17 @@
 import os
 import base64
 import time
+import requests   # <-- NEW for sending logs to server
 from utils.encryption import generate_key, encrypt_data, decrypt_data
 
-LOG_DIR = "logs"
+BASE_DIR = "/siem/siem_node"
+LOG_DIR = os.path.join(BASE_DIR, "logs")
 LOG_FILE = os.path.join(LOG_DIR, "siem_logs.enc")
-INCIDENT_LOG_FILE = os.path.join(LOG_DIR, "incidents.enc")  # <-- New file for incidents
+INCIDENT_LOG_FILE = os.path.join(LOG_DIR, "incidents.enc")
 KEY_FILE = os.path.join(LOG_DIR, "logging_key.bin")
+
+# ✅ Change this to your server’s address (LAN IP or localhost)
+SERVER_URL = "http://192.168.1.6:8000/logs"
 
 class EncryptedLogger:
     def __init__(self):
@@ -24,18 +29,30 @@ class EncryptedLogger:
         self.key = key
 
     def log(self, event_type, data):
-        """Normal encrypted log entry (unchanged)."""
+        """Normal encrypted log entry + send to server."""
         self._write_encrypted(LOG_FILE, event_type, data)
 
     def log_incident(self, event_type, data):
-        """Separate encrypted log entry for serious incidents."""
+        """Incident log entry + send to server."""
         self._write_encrypted(INCIDENT_LOG_FILE, event_type, data)
 
     def _write_encrypted(self, file_path, event_type, data):
         log_entry = f"{time.ctime()} | {event_type} | {data}".encode('utf-8')
         encrypted = encrypt_data(log_entry, self.key)
+
+        # save locally
         with open(file_path, 'a') as lf:
             lf.write(base64.b64encode(encrypted).decode() + "\n")
+
+        # also send to server (not encrypted, server stores it)
+        try:
+            requests.post(SERVER_URL, json={
+                "event_type": event_type,
+                "data": data
+            }, timeout=3)
+        except Exception as e:
+            # if server is down, don’t crash logger
+            print(f"[Logger Warning] Could not send log to server: {e}")
 
     def get_recent_events(self, limit=50, incidents=False):
         """Fetch last N decrypted events (normal by default)."""
