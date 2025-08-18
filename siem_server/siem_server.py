@@ -9,7 +9,7 @@ import os
 # -----------------------
 # Config
 # -----------------------
-API_KEY = os.getenv("LOG_SERVER_KEY", "supersecretkey")  # set as env var in production
+API_KEY = "secretkey"  # set as env var in production
 API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=True)
 
 DB_FILE = "logs.db"

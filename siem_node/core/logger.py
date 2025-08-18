@@ -2,17 +2,19 @@
 import os
 import base64
 import time
-import requests   # <-- NEW for sending logs to server
+import requests   # <-- for sending logs to server
 from utils.encryption import generate_key, encrypt_data, decrypt_data
 
-BASE_DIR = "/siem/siem_node"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))   # /siem/siem_node/core
+BASE_DIR = os.path.dirname(BASE_DIR)                   # /siem/siem_node
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 LOG_FILE = os.path.join(LOG_DIR, "siem_logs.enc")
 INCIDENT_LOG_FILE = os.path.join(LOG_DIR, "incidents.enc")
 KEY_FILE = os.path.join(LOG_DIR, "logging_key.bin")
 
-# ✅ Change this to your server’s address (LAN IP or localhost)
-SERVER_URL = "http://192.168.1.6:8000/logs"
+# ✅ Server endpoint and API key
+SERVER_URL = "http://192.168.139.129:8000/log"  
+API_KEY = "secretkey"                   # must match server config
 
 class EncryptedLogger:
     def __init__(self):
@@ -44,14 +46,19 @@ class EncryptedLogger:
         with open(file_path, 'a') as lf:
             lf.write(base64.b64encode(encrypted).decode() + "\n")
 
-        # also send to server (not encrypted, server stores it)
+        # also send to server
         try:
-            requests.post(SERVER_URL, json={
-                "event_type": event_type,
-                "data": data
-            }, timeout=3)
+            requests.post(
+                SERVER_URL,
+                json={
+                    "event_type": str(event_type),
+                    "data": str(data),
+                    "encrypted": base64.b64encode(encrypted).decode()
+                },
+                headers={"X-API-Key": API_KEY},
+                timeout=3
+            )
         except Exception as e:
-            # if server is down, don’t crash logger
             print(f"[Logger Warning] Could not send log to server: {e}")
 
     def get_recent_events(self, limit=50, incidents=False):
