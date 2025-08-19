@@ -47,3 +47,4 @@
 # --- Project-specific ---
 **/docs/
 commands.txt
+**logs.db
