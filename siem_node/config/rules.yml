@@ -74,3 +74,14 @@ TAMPER_BACKGROUND_STOPPED:
     value: "main.py"
     comparison: equals
     action: alert_admin
+
+
+
+# for network monitor
+white_list_ips:
+  - "127.0.0.1"
+  - "192.168.1.1"
+
+white_list_ports:
+  - "22"   # SSH
+  - "443"  # HTTPS

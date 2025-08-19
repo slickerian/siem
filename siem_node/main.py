@@ -1,9 +1,8 @@
-# main.py
 import os
 import time
 import threading
 import subprocess
-from core import usb_monitor, file_watcher, command_monitor, policy_engine, tamper_protection, response_actions
+from core import usb_monitor, file_watcher, command_monitor, policy_engine, tamper_protection, response_actions, network_monitor
 from core.logger import EncryptedLogger
 from utils.fingerprint import generate_device_fingerprint
 from utils.system_info import collect_all_system_info as collect_system_info
@@ -17,6 +16,7 @@ def start_monitor(module, name, logger, color=CYAN):
     def run():
         module.start(logger)
     threading.Thread(target=run, daemon=True).start()
+    print(color_text(f"[*] {name} Monitor Started", color))
 
 
 def main():
@@ -33,10 +33,12 @@ def main():
 
     print(color_text("[*] SIEM CLI Agent Starting...", CYAN))
 
-    start_monitor(usb_monitor, "USB", logger)
-    start_monitor(file_watcher, "File", logger)
-    start_monitor(command_monitor, "Command", logger)
-    start_monitor(tamper_protection, "Tamper", logger)
+    # Start monitors
+    start_monitor(usb_monitor, "USB", logger, GREEN)
+    start_monitor(file_watcher, "File", logger, MAGENTA)
+    start_monitor(command_monitor, "Command", logger, CYAN)
+    start_monitor(tamper_protection, "Tamper", logger, YELLOW)
+    start_monitor(network_monitor, "Network", logger, BLUE)   # <-- NEW
 
     try:
         logger.log("MONITORING_STARTED", {})
