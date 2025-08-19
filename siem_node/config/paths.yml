@@ -9,12 +9,8 @@ protected_files:
 
 # Directories/files to monitor (used by file_watcher.py)
 monitored_paths:
-  - /etc/passwd
-  - /etc/shadow
-  - /home
-  - /media
-  - /mnt
-  - /var/log
+  - /home/mechanic/test
 
 white_list_files:
   - /var/log/lightdm
+  - /etc/resolv.conf
