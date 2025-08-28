@@ -1,0 +1,25 @@
+actions:
+
+  alert_admin:
+    type: command
+    command: [ "echo", "ALERT: Admin notified of incident!" ]
+
+  trigger_investigation:
+    type: command
+    command: [ "python3", "scripts/start_investigation.py" ]
+
+  block_usb:
+    type: command
+    command: [ "modprobe", "-r", "usb_storage" ]
+
+  logoff_user:
+    type: command
+    command: [ "pkill", "-KILL", "-u", "CURRENT_USER" ]
+
+  lock_terminal:
+    type: command
+    command: [ "loginctl", "lock-session" ]
+
+  kill_process:
+    type: command
+    command: [ "kill", "-9", "TARGET_PID" ]
