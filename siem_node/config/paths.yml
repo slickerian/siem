@@ -1,11 +1,6 @@
 # Files to protect (used by tamper_protection.py)
 protected_files:
-  - main.py
-  - core/usb_monitor.py
-  - core/file_watcher.py
-  - core/command_monitor.py
-  - core/policy_engine.py
-  - core/logger.py
+  - config/auth.yml
 
 # Directories/files to monitor (used by file_watcher.py)
 monitored_paths:
