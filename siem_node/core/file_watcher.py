@@ -3,7 +3,7 @@ import time
 import threading
 import yaml
 from inotify_simple import INotify, flags
-from utils.colors import color_text, RED, GREEN, YELLOW, CYAN, MAGENTA, RESET, BLUE
+
 
 CONFIG_PATHS = os.path.join(os.path.dirname(__file__), "..", "config", "paths.yml")
 
@@ -29,7 +29,7 @@ def watch_path(inotify, path, path_lookup):
                 )
                 path_lookup[wd] = root
             except PermissionError:
-                print(color_text(f"[!] Permission denied on {root}", YELLOW))
+                print(f"[!] Permission denied on {root}")
     elif os.path.exists(path):
         try:
             wd = inotify.add_watch(
@@ -38,9 +38,9 @@ def watch_path(inotify, path, path_lookup):
             )
             path_lookup[wd] = os.path.dirname(path)
         except PermissionError:
-            print(color_text(f"[!] Permission denied on {path}", YELLOW))
+            print(f"[!] Permission denied on {path}")
     else:
-        print(color_text(f"[!] Path not found: {path}", RED))
+        print(f"[!] Path not found: {path}")
 
 def handle_event(event, path_lookup, logger, white_list):
     for flag in flags.from_mask(event.mask):
@@ -69,10 +69,10 @@ def handle_event(event, path_lookup, logger, white_list):
                 "timestamp": time.time(),
                 "event": event_type
             })
-            print(color_text(f"[EVENT] File {event_type}: {pathname}", MAGENTA))
+            print(f"[EVENT] File {event_type}: {pathname}")
 
 def start(logger):
-    print(color_text("[*] File Monitor Started...", GREEN))
+    print("[*] File Monitor Started...")
     inotify = INotify()
     path_lookup = {}
 

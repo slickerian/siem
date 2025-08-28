@@ -2,7 +2,7 @@ import psutil
 import time
 import yaml
 import os
-from utils.colors import color_text, MAGENTA, RED, GREEN
+
 
 CONFIG_RULES = os.path.join(os.path.dirname(__file__), "..", "config", "rules.yml")
 
@@ -14,7 +14,7 @@ def load_rules():
         return {}
 
 def start(logger, interval=5):
-    print(color_text("[*] Command Monitor Started...", GREEN))
+    print("[*] Command Monitor Started...")
     rules = load_rules()
     suspicious_bins = rules.get("suspicious_binaries", [])
     safe_processes = rules.get("safe_processes", [])

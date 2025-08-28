@@ -6,17 +6,17 @@ from core import usb_monitor, file_watcher, command_monitor, policy_engine, tamp
 from core.logger import EncryptedLogger
 from utils.fingerprint import generate_device_fingerprint
 from utils.system_info import collect_all_system_info as collect_system_info
-from utils.colors import color_text, RED, GREEN, YELLOW, CYAN, MAGENTA, BLUE
+
 
 SERVICE_NAME = "siem"
 SHUTDOWN_FLAG = "/tmp/insider_shutdown.flag"
 
 
-def start_monitor(module, name, logger, color=CYAN):
+def start_monitor(module, name, logger):
     def run():
         module.start(logger)
     threading.Thread(target=run, daemon=True).start()
-    print(color_text(f"[*] {name} Monitor Started", color))
+    print(f"[*] {name} Monitor Started")
 
 
 def main():
@@ -31,14 +31,14 @@ def main():
     with open("/tmp/insider_main.pid", "w") as f:
         f.write(str(os.getpid()))
 
-    print(color_text("[*] SIEM CLI Agent Starting...", CYAN))
+    print("[*] SIEM CLI Agent Starting...")
 
     # Start monitors
-    start_monitor(usb_monitor, "USB", logger, GREEN)
-    start_monitor(file_watcher, "File", logger, MAGENTA)
-    start_monitor(command_monitor, "Command", logger, CYAN)
-    start_monitor(tamper_protection, "Tamper", logger, YELLOW)
-    start_monitor(network_monitor, "Network", logger, BLUE)   # <-- NEW
+    start_monitor(usb_monitor, "USB", logger)
+    start_monitor(file_watcher, "File", logger)
+    start_monitor(command_monitor, "Command", logger)
+    start_monitor(tamper_protection, "Tamper", logger)
+    start_monitor(network_monitor, "Network", logger)
 
     try:
         logger.log("MONITORING_STARTED", {})
@@ -48,7 +48,7 @@ def main():
             if os.path.exists(SHUTDOWN_FLAG):
                 os.remove(SHUTDOWN_FLAG)
                 logger.log("SYSTEM_SHUTDOWN", {"reason": "Authorized via shutdown flag"})
-                print(color_text("[✓] Shutdown flag detected. Stopping service...", GREEN))
+                print("[✓] Shutdown flag detected. Stopping service...")
                 subprocess.run(["systemctl", "stop", SERVICE_NAME])
                 break
 
@@ -58,21 +58,21 @@ def main():
 
             for event in events:
                 if "POLICY_TRIGGER" in event or "ALERT" in event:
-                    print(color_text(f"[ALERT] {event.strip()}", YELLOW))
+                    print(f"[ALERT] {event.strip()}")
                 elif "ERROR" in event or "FATAL" in event:
-                    print(color_text(f"[ERROR] {event.strip()}", RED))
+                    print(f"[ERROR] {event.strip()}")
                 else:
-                    print(color_text(f"[EVENT] {event.strip()}", MAGENTA))
+                    print(f"[EVENT] {event.strip()}")
 
             for action, data in decisions:
-                print(color_text(f"[ACTION] Executing {action} for {data}", BLUE))
+                print(f"[ACTION] Executing {action} for {data}")
                 response_actions.execute(action, data, logger)
 
             time.sleep(5)
 
     except Exception as e:
         logger.log("FATAL_ERROR", {"exception": str(e)})
-        print(color_text(f"[FATAL] {str(e)}", RED))
+        print(f"[FATAL] {str(e)}")
         raise
 
 

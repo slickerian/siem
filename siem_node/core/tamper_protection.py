@@ -3,7 +3,7 @@ import os
 import time
 import psutil
 import yaml
-from utils.colors import color_text, RED, GREEN, YELLOW, CYAN, MAGENTA, RESET, BLUE
+
 
 # Config paths
 PATHS_FILE = os.path.join(os.path.dirname(__file__), "..", "config", "paths.yml")
@@ -85,7 +85,7 @@ def start(logger):
     Initializes tamper protection and periodically checks for issues.
     Runs in the background (daemon thread).
     """
-    print(color_text("[*] Tamper Protection Started...", GREEN))
+    print("[*] Tamper Protection Started...")
     import threading
     start_time = time.time()
     initialize_integrity(logger)

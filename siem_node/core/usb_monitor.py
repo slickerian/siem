@@ -3,7 +3,7 @@ import time
 import yaml
 import os
 import threading
-from utils.colors import color_text, RED, GREEN, YELLOW, CYAN, MAGENTA, RESET, BLUE
+
 
 # Load whitelist from rules.yml
 CONFIG_RULES = os.path.join(os.path.dirname(__file__), "..", "config", "rules.yml")
@@ -17,7 +17,7 @@ def load_whitelist():
         return []
 
 def start(logger):
-    print(color_text("[*] USB Monitor Started...", GREEN))
+    print("[*] USB Monitor Started...")
     context = pyudev.Context()
     monitor = pyudev.Monitor.from_netlink(context)
     monitor.filter_by(subsystem='usb')

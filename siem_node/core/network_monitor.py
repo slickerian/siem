@@ -3,7 +3,7 @@ import threading
 import psutil
 import yaml
 import os
-from utils.colors import color_text, RED, GREEN, YELLOW, MAGENTA
+
 
 CONFIG_RULES = os.path.join(os.path.dirname(__file__), "..", "config", "rules.yml")
 
@@ -47,16 +47,16 @@ def diff_connections(prev, curr, whitelist_ips, whitelist_ports, logger):
         logger.log("NET_CONNECT", {
             "local": laddr, "remote": raddr, "pid": pid, "status": status, "timestamp": time.time()
         })
-        print(color_text(f"[NET] New connection {laddr} -> {raddr} (PID {pid})", MAGENTA))
+        print(f"[NET] New connection {laddr} -> {raddr} (PID {pid})")
 
     for laddr, raddr, pid, status in closed_conns:
         logger.log("NET_DISCONNECT", {
             "local": laddr, "remote": raddr, "pid": pid, "status": status, "timestamp": time.time()
         })
-        print(color_text(f"[NET] Closed connection {laddr} -> {raddr} (PID {pid})", YELLOW))
+        print(f"[NET] Closed connection {laddr} -> {raddr} (PID {pid})")
 
 def start(logger, interval=2):
-    print(color_text("[*] Network Monitor Started...", GREEN))
+    print("[*] Network Monitor Started...")
     whitelist_ips, whitelist_ports = load_network_rules()
 
     prev = snapshot_connections()
