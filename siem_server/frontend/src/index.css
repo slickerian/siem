@@ -1,68 +1,173 @@
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+/* SIEM Dashboard Design System - Professional Security Interface */
 
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
-
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
-}
-
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
+@layer base {
   :root {
-    color: #213547;
-    background-color: #ffffff;
+    /* Dark theme base colors for SIEM interface */
+    --background: 222 18% 8%;
+    --foreground: 210 20% 95%;
+
+    --card: 222 18% 10%;
+    --card-foreground: 210 20% 95%;
+
+    --popover: 222 18% 10%;
+    --popover-foreground: 210 20% 95%;
+
+    --primary: 142 76% 36%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 222 18% 15%;
+    --secondary-foreground: 210 20% 85%;
+
+    --muted: 222 18% 12%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 222 18% 15%;
+    --accent-foreground: 210 20% 95%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    --warning: 48 96% 53%;
+    --warning-foreground: 20 14% 4%;
+
+    --info: 217 92% 60%;
+    --info-foreground: 210 40% 98%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 210 40% 98%;
+
+    --border: 222 18% 18%;
+    --input: 222 18% 15%;
+    --ring: 142 76% 36%;
+
+    --radius: 0.75rem;
+
+    /* SIEM specific colors */
+    --siem-critical: 0 84% 60%;
+    --siem-high: 25 95% 53%;
+    --siem-medium: 48 96% 53%;
+    --siem-low: 142 76% 36%;
+    --siem-info: 217 92% 60%;
+
+    /* Chart colors */
+    --chart-1: 142 76% 36%;
+    --chart-2: 217 92% 60%;
+    --chart-3: 48 96% 53%;
+    --chart-4: 25 95% 53%;
+    --chart-5: 0 84% 60%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(142 76% 45%));
+    --gradient-danger: linear-gradient(135deg, hsl(var(--destructive)), hsl(0 84% 70%));
+    --gradient-surface: linear-gradient(180deg, hsl(var(--card)), hsl(222 18% 12%));
+
+    /* Shadows */
+    --shadow-glow: 0 0 20px hsl(var(--primary) / 0.2);
+    --shadow-card: 0 4px 12px hsl(222 18% 4% / 0.5);
+    --shadow-elevated: 0 8px 30px hsl(222 18% 4% / 0.7);
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
   }
-  a:hover {
-    color: #747bff;
+
+  .light {
+    /* Light theme overrides */
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 142 76% 36%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 142 76% 36%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
   }
-  button {
-    background-color: #f9f9f9;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-mono;
+    background: hsl(var(--background));
+  }
+
+  /* SIEM specific utilities */
+  .siem-card {
+    @apply bg-card border border-border rounded-lg p-6 shadow-lg;
+    background: linear-gradient(145deg, hsl(var(--card)), hsl(222 18% 12%));
+    box-shadow: var(--shadow-card);
+  }
+
+  .siem-header {
+    @apply bg-card border-b border-border;
+    background: linear-gradient(90deg, hsl(var(--card)), hsl(222 18% 12%));
+  }
+
+  .severity-critical {
+    @apply text-red-400 bg-red-500/10 border-red-500/20;
+  }
+
+  .severity-high {
+    @apply text-orange-400 bg-orange-500/10 border-orange-500/20;
+  }
+
+  .severity-medium {
+    @apply text-yellow-400 bg-yellow-500/10 border-yellow-500/20;
+  }
+
+  .severity-low {
+    @apply text-green-400 bg-green-500/10 border-green-500/20;
+  }
+
+  .severity-info {
+    @apply text-blue-400 bg-blue-500/10 border-blue-500/20;
+  }
+
+  .status-indicator {
+    @apply inline-block w-2 h-2 rounded-full mr-2;
+  }
+
+  .animate-pulse-slow {
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .monospace {
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
   }
 }
