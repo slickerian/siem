@@ -65,7 +65,7 @@ SUSPICIOUS_COMMAND:
 
 TAMPER_REBOOT_SUSPECTED:
   - field: uptime_seconds
-    value: 60  # Stored as a number now
+    value: 60  
     comparison: less_than
     action: trigger_investigation
 
@@ -79,6 +79,7 @@ TAMPER_BACKGROUND_STOPPED:
 
 # for network monitor
 white_list_ips:
+  - "192.168.199.129"
   - "127.0.0.1"
   - "192.168.1.1"
 

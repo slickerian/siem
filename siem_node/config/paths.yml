@@ -1,6 +1,8 @@
 # Files to protect (used by tamper_protection.py)
 protected_files:
-  - config/auth.yml
+  - config/paths.yml
+  - config/rules.yml
+  - config/response_actions.yml
 
 # Directories/files to monitor (used by file_watcher.py)
 monitored_paths:
