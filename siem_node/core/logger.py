@@ -13,7 +13,7 @@ INCIDENT_LOG_FILE = os.path.join(LOG_DIR, "incidents.enc")
 KEY_FILE = os.path.join(LOG_DIR, "logging_key.bin")
 
 # ✅ Server endpoint and API key
-SERVER_URL = "http://192.168.199.129:8000/log"  
+SERVER_URL = "http://192.168.1.2:8000/log"  
 API_KEY = "secretkey"                   # must match server config
 
 class EncryptedLogger:
