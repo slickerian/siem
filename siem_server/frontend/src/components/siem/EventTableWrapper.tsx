@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { siemApi, LogEntry } from "@/services/siemApi";
 import { EventTable } from "./EventTable";
 
@@ -15,11 +15,21 @@ export function EventTableWrapper({
 }: EventTableWrapperProps) {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [chartData, setChartData] = useState<Array<{ bucket: string; count: number }>>([]);
+  const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
 
-  // Helper: aggregate logs into timeline buckets
+  const bufferRef = useRef<LogEntry[]>([]);
+  const flushTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // --- Debounce search input ---
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  // --- Aggregate logs helper ---
   const aggregateLogs = (logs: LogEntry[], bucketMinutes = 5) => {
     const buckets: Record<string, number> = {};
-    logs.forEach((log) => {
+    logs.forEach(log => {
       const date = new Date(log.created_at);
       const minutes = Math.floor(date.getMinutes() / bucketMinutes) * bucketMinutes;
       const bucketKey = new Date(
@@ -37,76 +47,84 @@ export function EventTableWrapper({
       .map(([bucket, count]) => ({ bucket, count }));
   };
 
-  // Helper: calculate live stats
+  // --- Calculate stats helper ---
   const calculateStats = (logs: LogEntry[]) => {
     const total = logs.length;
-
-    const critical = logs.filter((log) =>
-      ["ERROR", "CRITICAL", "FAIL"].some((k) =>
-        log.event_type.toUpperCase().includes(k)
-      )
+    const critical = logs.filter(log =>
+      ["ERROR", "CRITICAL", "FAIL"].some(k => log.event_type.toUpperCase().includes(k))
     ).length;
 
     const now = new Date();
-    const last24h = logs.filter((log) => {
-      const logTime = new Date(log.created_at);
-      return now.getTime() - logTime.getTime() <= 24 * 60 * 60 * 1000;
-    }).length;
+    const last24h = logs.filter(log => now.getTime() - new Date(log.created_at).getTime() <= 24 * 60 * 60 * 1000).length;
 
     const firstLog = logs.length ? new Date(logs[logs.length - 1].created_at) : now;
-    const hoursElapsed = Math.max(
-      1,
-      (now.getTime() - firstLog.getTime()) / (1000 * 60 * 60)
-    );
+    const hoursElapsed = Math.max(1, (now.getTime() - firstLog.getTime()) / (1000 * 60 * 60));
     const avgPerHour = Math.round(total / hoursElapsed);
 
     if (onStatsUpdate) onStatsUpdate(total, critical, last24h, avgPerHour);
   };
 
-  // Fetch initial logs
+  // --- Fetch logs whenever debouncedSearch changes ---
   useEffect(() => {
     let isMounted = true;
-    siemApi.getLogs({ limit: 1000 }).then((res) => {
+
+    siemApi.getLogs({ limit: 1000, q: debouncedSearch }).then(res => {
       if (!isMounted) return;
       setLogs(res.items);
+
       const aggregated = aggregateLogs(res.items);
       setChartData(aggregated);
       if (onChartDataUpdate) onChartDataUpdate(aggregated);
       calculateStats(res.items);
     });
-    return () => {
-      isMounted = false;
-    };
-  }, [onChartDataUpdate, onStatsUpdate]);
 
-  // WebSocket subscription for live updates (with throttle)
+    return () => { isMounted = false; };
+  }, [debouncedSearch, onChartDataUpdate, onStatsUpdate]);
+
+  // --- WebSocket with throttled updates & reconnect ---
   useEffect(() => {
-    let buffer: LogEntry[] = [];
-    let flushTimer: NodeJS.Timeout | null = null;
+    let ws: WebSocket | null = null;
+    let closedByUser = false;
 
-    const ws = siemApi.connectWebSocket((newLog: LogEntry) => {
-      buffer.push(newLog);
+    const flushBuffer = () => {
+      if (bufferRef.current.length === 0) return;
 
-      if (!flushTimer) {
-        flushTimer = setTimeout(() => {
-          setLogs((prevLogs) => {
-            const updatedLogs = [...buffer, ...prevLogs].slice(0, 1000); // keep 1000
-            const aggregated = aggregateLogs(updatedLogs);
-            setChartData(aggregated);
-            if (onChartDataUpdate) onChartDataUpdate(aggregated);
-            calculateStats(updatedLogs);
-            return updatedLogs;
-          });
+      setLogs(prev => {
+        const updated = [...bufferRef.current, ...prev].slice(0, 1000);
+        const aggregated = aggregateLogs(updated);
+        setChartData(aggregated);
+        if (onChartDataUpdate) onChartDataUpdate(aggregated);
+        calculateStats(updated);
+        bufferRef.current = [];
+        return updated;
+      });
+    };
 
-          buffer = [];
-          flushTimer = null;
-        }, 1000); // flush every 1s
-      }
-    });
+    const connect = () => {
+      ws = siemApi.connectWebSocket((newLog: LogEntry) => {
+        bufferRef.current.push(newLog);
+        if (!flushTimerRef.current) {
+          flushTimerRef.current = setTimeout(() => {
+            flushBuffer();
+            flushTimerRef.current = null;
+          }, 500); // throttle updates every 500ms
+        }
+      });
+
+      ws.onclose = () => {
+        if (!closedByUser) {
+          console.warn("WebSocket closed, reconnecting in 2s...");
+          setTimeout(connect, 2000);
+        }
+      };
+    };
+
+    connect();
 
     return () => {
-      ws.close();
-      if (flushTimer) clearTimeout(flushTimer);
+      closedByUser = true;
+      ws?.close();
+      if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
     };
   }, [onChartDataUpdate, onStatsUpdate]);
 

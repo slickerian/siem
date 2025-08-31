@@ -13,9 +13,6 @@ import { FilterPanel } from '@/components/siem/FilterPanel';
 import { siemApi, type StatsResponse } from '@/services/siemApi';
 
 const Index = () => {
-  // -----------------------------
-  // State management
-  // -----------------------------
   const [chartData, setChartData] = useState<{ bucket: string; count: number }[]>([]);
   const [stats, setStats] = useState<StatsResponse | null>(null);
 
@@ -26,7 +23,6 @@ const Index = () => {
     avgPerHour: 0,
   });
 
-  const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,9 +34,6 @@ const Index = () => {
     bucketMinutes: 5,
   });
 
-  // -----------------------------
-  // Load initial logs/stats from API
-  // -----------------------------
   const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -88,16 +81,10 @@ const Index = () => {
     }
   }, [filters]);
 
-  // -----------------------------
-  // Load initial data on mount
-  // -----------------------------
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  // -----------------------------
-  // Filters & Export handlers
-  // -----------------------------
   const handleFiltersChange = (newFilters: Partial<typeof filters>) =>
     setFilters(prev => ({ ...prev, ...newFilters }));
 
@@ -115,18 +102,13 @@ const Index = () => {
   const handleExport = () => {
     const exportParams: any = {};
     if (filters.eventType) exportParams.event_type = filters.eventType;
-    if (searchQuery.trim()) exportParams.q = searchQuery.trim();
     window.open(siemApi.getExportUrl(exportParams), '_blank');
   };
 
-  // Count active filters
   const activeFiltersCount = Object.values(filters).filter(
     v => v !== '' && v !== 5 && v !== '24h'
   ).length;
 
-  // -----------------------------
-  // Error UI
-  // -----------------------------
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -147,16 +129,11 @@ const Index = () => {
     );
   }
 
-  // -----------------------------
-  // Render
-  // -----------------------------
   return (
     <div className="min-h-screen bg-background">
       <Header
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
         onExport={handleExport}
-        isConnected={true} // always true now, or add from wrapper if you expose it
+        isConnected={true}
         totalEvents={liveStats.total}
       />
 
@@ -177,7 +154,6 @@ const Index = () => {
         </div>
 
         <EventTableWrapper
-          searchQuery={searchQuery}
           onChartDataUpdate={setChartData}
           onStatsUpdate={(total, critical, last24h, avgPerHour) =>
             setLiveStats({ total, critical, last24h, avgPerHour })
