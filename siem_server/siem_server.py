@@ -123,7 +123,7 @@ async def websocket_endpoint(ws: WebSocket):
 # -----------------------------
 @app.get("/api/logs")
 def get_logs(
-    limit: int = Query(1000, ge=1, le=5000),
+    limit: int = Query(4000, ge=1, le=5000),
     offset: int = Query(0, ge=0),
     event_type: Optional[str] = Query(None),
     q: Optional[str] = Query(None),

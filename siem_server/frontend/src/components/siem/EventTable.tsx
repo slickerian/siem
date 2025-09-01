@@ -65,7 +65,12 @@ export function EventTable({ data, searchQuery, onSearchChange }) {
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Search logs..."
-          className="w-full p-2 border rounded-md text-sm"
+          className="
+            w-full p-2 rounded-md border border-border text-sm
+            bg-[hsl(var(--input))] text-[hsl(var(--foreground))]
+            placeholder-[hsl(var(--muted-foreground))]
+            focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]
+          "
         />
       </div>
 
