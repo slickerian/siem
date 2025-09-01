@@ -140,8 +140,8 @@ def get_logs(
         query += " AND event_type = ?"
         params.append(event_type)
     if q:
-        query += " AND data LIKE ?"
-        params.append(f"%{q}%")
+        query += " AND (LOWER(event_type) LIKE LOWER(?) OR LOWER(data) LIKE LOWER(?))"
+        params.extend([f"%{q}%", f"%{q}%"])
     if start:
         query += " AND created_at >= ?"
         params.append(parse_time(start))
@@ -182,8 +182,8 @@ def get_stats(
         filters += " AND event_type = ?"
         params.append(event_type)
     if q:
-        filters += " AND  data LIKE ?"
-        params.append(f"%{q}%" )
+        filters += " AND (LOWER(event_type) LIKE LOWER(?) OR LOWER(data) LIKE LOWER(?))"
+        params.extend([f"%{q}%", f"%{q}%"])
     if start:
         filters += " AND created_at >= ?"
         params.append(parse_time(start))
