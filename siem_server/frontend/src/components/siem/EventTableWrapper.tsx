@@ -3,18 +3,16 @@ import { siemApi, LogEntry } from "@/services/siemApi";
 import { EventTable } from "./EventTable";
 
 interface EventTableWrapperProps {
-  searchQuery?: string;
   onChartDataUpdate?: (chartData: Array<{ bucket: string; count: number }>) => void;
   onStatsUpdate?: (total: number, critical: number, last24h: number, avgPerHour: number) => void;
 }
 
 export function EventTableWrapper({
-  searchQuery = "",
   onChartDataUpdate,
   onStatsUpdate,
 }: EventTableWrapperProps) {
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [chartData, setChartData] = useState<Array<{ bucket: string; count: number }>>([]);
+  const [searchQuery, setSearchQuery] = useState(""); // 👈 now controlled here
   const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
 
   const bufferRef = useRef<LogEntry[]>([]);
@@ -73,7 +71,6 @@ export function EventTableWrapper({
       setLogs(res.items);
 
       const aggregated = aggregateLogs(res.items);
-      setChartData(aggregated);
       if (onChartDataUpdate) onChartDataUpdate(aggregated);
       calculateStats(res.items);
     });
@@ -92,7 +89,6 @@ export function EventTableWrapper({
       setLogs(prev => {
         const updated = [...bufferRef.current, ...prev].slice(0, 1000);
         const aggregated = aggregateLogs(updated);
-        setChartData(aggregated);
         if (onChartDataUpdate) onChartDataUpdate(aggregated);
         calculateStats(updated);
         bufferRef.current = [];
@@ -107,7 +103,7 @@ export function EventTableWrapper({
           flushTimerRef.current = setTimeout(() => {
             flushBuffer();
             flushTimerRef.current = null;
-          }, 500); // throttle updates every 500ms
+          }, 500);
         }
       });
 
@@ -128,5 +124,11 @@ export function EventTableWrapper({
     };
   }, [onChartDataUpdate, onStatsUpdate]);
 
-  return <EventTable data={logs} searchQuery={searchQuery} />;
+  return (
+    <EventTable
+      data={logs}
+      searchQuery={searchQuery}
+      onSearchChange={setSearchQuery} // 👈 pass handler to child
+    />
+  );
 }

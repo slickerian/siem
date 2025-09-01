@@ -2,15 +2,13 @@ import {
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
-  getFilteredRowModel,
   useReactTable,
 } from "@tanstack/react-table";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 
-export function EventTable({ data, searchQuery }) {
+export function EventTable({ data, searchQuery, onSearchChange }) {
   const [sorting, setSorting] = useState([]);
-  const [columnFilters, setColumnFilters] = useState([]);
 
   const getSeverityVariant = (eventType) => {
     const type = eventType?.toUpperCase() || "";
@@ -47,40 +45,36 @@ export function EventTable({ data, searchQuery }) {
     },
   ];
 
-  const filteredData = searchQuery
-    ? data.filter((row) =>
-        Object.values(row).some((val) =>
-          String(val).toLowerCase().includes(searchQuery.toLowerCase())
-        )
-      )
-    : data;
-
   const table = useReactTable({
-    data: filteredData,
+    data,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
     onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
     state: {
       sorting,
-      columnFilters,
     },
   });
 
   return (
     <div className="w-full">
+      {/* 🔎 Search bar (UI only, logic in wrapper) */}
+      <div className="mb-2">
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder="Search logs..."
+          className="w-full p-2 border rounded-md text-sm"
+        />
+      </div>
+
       <div className="border border-border rounded-lg overflow-hidden">
-        {/* Scrollable table container */}
         <div className="max-h-[500px] overflow-y-auto">
           <table className="min-w-full border-collapse">
             <thead className="sticky top-0 z-10 bg-muted/50">
               {table.getHeaderGroups().map((headerGroup) => (
-                <tr
-                  key={headerGroup.id}
-                  className="border-b border-border hover:bg-transparent"
-                >
+                <tr key={headerGroup.id} className="border-b border-border">
                   {headerGroup.headers.map((header) => (
                     <th
                       key={header.id}
@@ -88,10 +82,7 @@ export function EventTable({ data, searchQuery }) {
                     >
                       {header.isPlaceholder
                         ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
+                        : flexRender(header.column.columnDef.header, header.getContext())}
                     </th>
                   ))}
                 </tr>
@@ -105,10 +96,7 @@ export function EventTable({ data, searchQuery }) {
                     className="border-b border-border hover:bg-muted/30 transition-colors"
                   >
                     {row.getVisibleCells().map((cell) => (
-                      <td
-                        key={cell.id}
-                        className="px-4 py-2 text-sm text-foreground"
-                      >
+                      <td key={cell.id} className="px-4 py-2 text-sm text-foreground">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}
