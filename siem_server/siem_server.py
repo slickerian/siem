@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 import sqlite3
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import io
 import csv
 
@@ -123,7 +123,7 @@ async def websocket_endpoint(ws: WebSocket):
 # -----------------------------
 @app.get("/api/logs")
 def get_logs(
-    limit: int = Query(4000, ge=1, le=5000),
+    limit: int = Query(ge=1, le=5000),
     offset: int = Query(0, ge=0),
     event_type: Optional[str] = Query(None),
     q: Optional[str] = Query(None),
@@ -154,10 +154,18 @@ def get_logs(
 
     rows = cur.execute(query, params).fetchall()
     total = cur.execute("SELECT COUNT(*) FROM logs").fetchone()[0]
+
+    since = (datetime.utcnow() - timedelta(hours=24)).isoformat()
+    last24h = cur.execute(
+        "SELECT COUNT(*) FROM logs WHERE created_at >= ?",
+        (since,)
+    ).fetchone()[0]
+    
     conn.close()
 
     return {
         "total": total,
+        "last24h": last24h,
         "items": [dict(row) for row in rows],
     }
 

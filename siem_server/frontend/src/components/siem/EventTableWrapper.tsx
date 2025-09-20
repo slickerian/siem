@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { siemApi, LogEntry } from "@/services/siemApi";
 import { EventTable } from "./EventTable";
+import { Rss } from "lucide-react";
 
 interface EventTableWrapperProps {
   onChartDataUpdate?: (chartData: Array<{ bucket: string; count: number }>) => void;
@@ -46,8 +47,8 @@ export function EventTableWrapper({
   };
 
   // --- Calculate stats helper ---
-  const calculateStats = (logs: LogEntry[]) => {
-    const total = logs.length;
+  const calculateStats = (logs: LogEntry[], totalFromBackend?: number) => {
+    const total = totalFromBackend ?? logs.length;
     const critical = logs.filter(log =>
       ["ERROR", "CRITICAL", "FAIL"].some(k => log.event_type.toUpperCase().includes(k))
     ).length;
@@ -68,16 +69,40 @@ export function EventTableWrapper({
 
     siemApi.getLogs({ limit: 1000, q: debouncedSearch }).then(res => {
       if (!isMounted) return;
+      
       setLogs(res.items);
+
+      const total = res.total;
+      const last24h = res.last24h;
 
       const aggregated = aggregateLogs(res.items);
       if (onChartDataUpdate) onChartDataUpdate(aggregated);
-      calculateStats(res.items);
+
+      if (onStatsUpdate) {
+        const critical = res.items.filter(log =>
+          ["ERROR", "CRITICAL", "FAIL"].some(k =>
+            log.event_type.toUpperCase().includes(k)
+          )
+        ).length;
+
+        const firstLog = res.items.length
+          ? new Date(res.items[res.items.length - 1].created_at)
+          : new Date();
+        const hoursElapsed = Math.max(
+          1,
+          (new Date().getTime() - firstLog.getTime()) / (1000 * 60 * 60)
+        );
+        const avgPerHour = Math.round(total / hoursElapsed);
+
+        onStatsUpdate(total, critical, last24h, avgPerHour); //backend values : last24h
+      }
     });
 
     return () => { isMounted = false; };
   }, [debouncedSearch, onChartDataUpdate, onStatsUpdate]);
 
+
+  
   // --- WebSocket with throttled updates & reconnect ---
   useEffect(() => {
     let ws: WebSocket | null = null;

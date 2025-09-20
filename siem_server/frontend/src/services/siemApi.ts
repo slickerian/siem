@@ -25,6 +25,7 @@ export interface StatsResponse {
 
 export interface LogsResponse {
   total: number;
+  last24h: number;
   items: LogEntry[];
 }
 
