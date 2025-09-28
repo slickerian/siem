@@ -10,7 +10,7 @@ import { EventTableWrapper } from '@/components/siem/EventTableWrapper';
 import { FilterPanel } from '@/components/siem/FilterPanel';
 
 // Services
-import { siemApi, type StatsResponse } from '@/services/siemApi';
+import { siemApi, type StatsResponse, type LogsResponse } from '@/services/siemApi';
 
 const Index = () => {
   const [chartData, setChartData] = useState<{ bucket: string; count: number }[]>([]);
@@ -61,12 +61,24 @@ const Index = () => {
         apiParams.end = filters.endDate.replace('T', ' ');
       }
 
+      // Fetch stats and chart data from backend
       const statsResponse = await siemApi.getStats({
         ...apiParams,
         bucket_minutes: filters.bucketMinutes,
       });
-
       setStats(statsResponse);
+
+      // Fetch live stats from backend (total, critical, last24h, avg/hour)
+      const logsResponse: LogsResponse = await siemApi.getLogs(apiParams);
+      setLiveStats({
+        total: logsResponse.total,
+        critical: logsResponse.critical,
+        last24h: logsResponse.last24h,
+        avgPerHour: logsResponse.avgPerHour,
+      });
+
+      // Update chart data
+      setChartData(statsResponse.timeseries);
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load data';

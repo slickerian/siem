@@ -151,21 +151,33 @@ def get_logs(
 
     query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
     params.extend([limit, offset])
-
     rows = cur.execute(query, params).fetchall()
-    total = cur.execute("SELECT COUNT(*) FROM logs").fetchone()[0]
 
+    # --- calculate stats in backend ---
+    total = cur.execute("SELECT COUNT(*) FROM logs").fetchone()[0]
     since = (datetime.utcnow() - timedelta(hours=24)).isoformat()
     last24h = cur.execute(
-        "SELECT COUNT(*) FROM logs WHERE created_at >= ?",
-        (since,)
+        "SELECT COUNT(*) FROM logs WHERE created_at >= ?", (since,)
     ).fetchone()[0]
-    
+
+    critical = cur.execute(
+        "SELECT COUNT(*) FROM logs WHERE UPPER(event_type) IN ('ERROR', 'CRITICAL', 'FAIL')"
+    ).fetchone()[0]
+
+    first_log_time = cur.execute(
+        "SELECT MIN(created_at) FROM logs"
+    ).fetchone()[0]
+    first_log_time = datetime.fromisoformat(first_log_time) if first_log_time else datetime.utcnow()
+    hours_elapsed = max(1, (datetime.utcnow() - first_log_time).total_seconds() / 3600)
+    avg_per_hour = round(total / hours_elapsed)
+
     conn.close()
 
     return {
         "total": total,
+        "critical": critical,
         "last24h": last24h,
+        "avgPerHour": avg_per_hour,
         "items": [dict(row) for row in rows],
     }
 
@@ -178,7 +190,7 @@ def get_stats(
     q: Optional[str] = None,
     start: Optional[str] = None,
     end: Optional[str] = None,
-    bucket_minutes: int = 60,
+    bucket_minutes: int = 5,
 ):
     conn = get_db()
     cur = conn.cursor()
@@ -199,15 +211,18 @@ def get_stats(
         filters += " AND created_at <= ?"
         params.append(parse_time(end))
 
+    # Histogram by event type
     histo = cur.execute(
         f"SELECT event_type, COUNT(*) as count FROM logs {filters} GROUP BY event_type",
         params,
     ).fetchall()
 
+    # Timeseries aggregation by bucket_minutes
     times = cur.execute(
         f"""
-        SELECT strftime('%Y-%m-%d %H:%M:00', created_at) as bucket,
-               COUNT(*) as count
+        SELECT 
+            strftime('%Y-%m-%d %H:%M:00', created_at) as bucket,
+            COUNT(*) as count
         FROM logs {filters}
         GROUP BY bucket
         ORDER BY bucket
@@ -220,6 +235,7 @@ def get_stats(
     return {
         "histogram": [dict(r) for r in histo],
         "timeseries": [dict(r) for r in times],
+        "bucket_minutes": bucket_minutes,
         "start": start,
         "end": end,
     }

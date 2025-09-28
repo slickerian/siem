@@ -1,7 +1,7 @@
 // src/services/siemApi.ts
 // ✅ SIEM API Service - connects to the Python FastAPI backend
 
-const API_BASE_URL = 'http://localhost:8000'; // Frontend talks to backend on localhost
+const API_BASE_URL = 'http://localhost:8000'; // Frontend talks to backend
 
 export interface LogEntry {
   id: number;
@@ -25,7 +25,9 @@ export interface StatsResponse {
 
 export interface LogsResponse {
   total: number;
+  critical: number;
   last24h: number;
+  avgPerHour: number;
   items: LogEntry[];
 }
 
@@ -62,7 +64,7 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
 }
 
 export const siemApi = {
-  // 🔹 Fetch logs with filters and pagination
+  // Fetch logs with filters
   async getLogs(params: {
     limit?: number;
     offset?: number;
@@ -82,7 +84,7 @@ export const siemApi = {
     return apiRequest<LogsResponse>(`/api/logs${queryString ? `?${queryString}` : ''}`);
   },
 
-  // 🔹 Fetch statistics and charts data
+  // Fetch statistics and chart data
   async getStats(params: {
     event_type?: string;
     q?: string;
@@ -101,7 +103,7 @@ export const siemApi = {
     return apiRequest<StatsResponse>(`/api/stats${queryString ? `?${queryString}` : ''}`);
   },
 
-  // 🔹 Export logs as CSV
+  // Export logs as CSV
   getExportUrl(params: {
     event_type?: string;
     q?: string;
@@ -119,7 +121,7 @@ export const siemApi = {
     return `${API_BASE_URL}/export.csv${queryString ? `?${queryString}` : ''}`;
   },
 
-  // 🔹 Health check
+  // Health check
   async healthCheck(): Promise<boolean> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/logs?limit=1`);
@@ -129,7 +131,7 @@ export const siemApi = {
     }
   },
 
-  // 🔹 WebSocket connection for live log updates
+  // WebSocket connection for live log updates
   connectWebSocket(onMessage: (log: LogEntry) => void): WebSocket {
     const wsUrl = API_BASE_URL.replace('http', 'ws') + '/ws/logs';
     const ws = new WebSocket(wsUrl);
