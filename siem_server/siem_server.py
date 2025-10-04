@@ -1,20 +1,21 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional
 import sqlite3
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import io
 import csv
+import asyncio
 
 app = FastAPI()
 
 # Allow frontend access
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # for dev; change later to frontend URL
+    allow_origins=["*"],  # Change to frontend URL in prod
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -26,7 +27,7 @@ DB_FILE = "siem.db"
 # Database Helpers
 # -----------------------------
 def get_db():
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -66,10 +67,10 @@ def parse_time(value: Optional[str]) -> Optional[str]:
     if not value:
         return None
     try:
-        return datetime.fromisoformat(value).isoformat()
+        return datetime.fromisoformat(value).replace(tzinfo=timezone.utc).isoformat()
     except ValueError:
         try:
-            return datetime.strptime(value, "%Y-%m-%d %H:%M:%S").isoformat()
+            return datetime.strptime(value, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).isoformat()
         except ValueError:
             raise ValueError(f"Invalid date format: {value}")
 
@@ -78,31 +79,68 @@ def parse_time(value: Optional[str]) -> Optional[str]:
 # -----------------------------
 active_connections: List[WebSocket] = []
 
+async def broadcast(payload: dict):
+    to_remove = []
+    coros = []
+    for ws in active_connections:
+        coros.append(ws.send_text(json.dumps(payload)))
+    results = await asyncio.gather(*coros, return_exceptions=True)
+    for i, res in enumerate(results):
+        if isinstance(res, Exception):
+            to_remove.append(active_connections[i])
+    for ws in to_remove:
+        active_connections.remove(ws)
+
 # -----------------------------
 # /log - ingestion from nodes
 # -----------------------------
 @app.post("/log")
-async def ingest_log(log: LogIn):   # ✅ made async
-    now = datetime.utcnow().isoformat()
+async def ingest_log(log: LogIn):
+    now = datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()
     conn = get_db()
     cur = conn.cursor()
+
+    # Insert the new log
     cur.execute(
         "INSERT INTO logs (created_at, event_type, data) VALUES (?, ?, ?)",
         (now, log.event_type, log.data),
     )
     conn.commit()
+
+    # Calculate totals
+    total_count = cur.execute("SELECT COUNT(*) FROM logs").fetchone()[0]
+
+    # Critical logs
+    critical_count = cur.execute(
+        "SELECT COUNT(*) FROM logs WHERE UPPER(TRIM(event_type)) IN ('ERROR','CRITICAL','FAIL','ACTION_FAILED')"
+    ).fetchone()[0]
+
+    # Last 24h logs
+    since = (datetime.utcnow() - timedelta(hours=24)).replace(tzinfo=timezone.utc).isoformat()
+    last24h_count = cur.execute(
+        "SELECT COUNT(*) FROM logs WHERE created_at >= ?", (since,)
+    ).fetchone()[0]
+
+    # Average per hour
+    first_log_time = cur.execute("SELECT MIN(created_at) FROM logs").fetchone()[0]
+    first_log_time = datetime.fromisoformat(first_log_time) if first_log_time else datetime.utcnow()
+    hours_elapsed = max(1, (datetime.utcnow() - first_log_time).total_seconds() / 3600)
+    avg_per_hour = round(total_count / hours_elapsed)
+
+    payload = {
+        "event_type": log.event_type,
+        "data": log.data,
+        "created_at": now,
+        "total": total_count,
+        "critical": critical_count,
+        "last24h": last24h_count,
+        "avgPerHour": avg_per_hour,
+    }
+
+    await broadcast(payload)
     conn.close()
-
-    payload = {"event_type": log.event_type, "data": log.data, "created_at": now}
-
-    # Broadcast to WS clients
-    for ws in list(active_connections):
-        try:
-            await ws.send_text(json.dumps(payload))   # ✅ await properly
-        except:
-            active_connections.remove(ws)
-
     return {"status": "ok"}
+
 
 # -----------------------------
 # /ws - realtime updates
@@ -113,7 +151,7 @@ async def websocket_endpoint(ws: WebSocket):
     active_connections.append(ws)
     try:
         while True:
-            await ws.receive_text()  # keep alive
+            await ws.receive_text()  # keep-alive
     except WebSocketDisconnect:
         if ws in active_connections:
             active_connections.remove(ws)
@@ -153,25 +191,29 @@ def get_logs(
     params.extend([limit, offset])
     rows = cur.execute(query, params).fetchall()
 
-    # --- calculate stats in backend ---
     total = cur.execute("SELECT COUNT(*) FROM logs").fetchone()[0]
-    since = (datetime.utcnow() - timedelta(hours=24)).isoformat()
+    since = (datetime.utcnow() - timedelta(hours=24)).replace(tzinfo=timezone.utc).isoformat()
     last24h = cur.execute(
         "SELECT COUNT(*) FROM logs WHERE created_at >= ?", (since,)
     ).fetchone()[0]
 
+
     critical = cur.execute(
-        "SELECT COUNT(*) FROM logs WHERE UPPER(event_type) IN ('ERROR', 'CRITICAL', 'FAIL')"
+        "SELECT COUNT(*) FROM logs WHERE UPPER(TRIM(event_type)) IN ('ERROR', 'CRITICAL', 'FAIL', 'ACTION_FAILED')"
     ).fetchone()[0]
 
-    first_log_time = cur.execute(
-        "SELECT MIN(created_at) FROM logs"
-    ).fetchone()[0]
+        
+
+    first_log_time = cur.execute("SELECT MIN(created_at) FROM logs").fetchone()[0]
     first_log_time = datetime.fromisoformat(first_log_time) if first_log_time else datetime.utcnow()
     hours_elapsed = max(1, (datetime.utcnow() - first_log_time).total_seconds() / 3600)
     avg_per_hour = round(total / hours_elapsed)
 
+    # print([dict(row) for row in rows[:10]])  # 👈 only first 5 logs
+
     conn.close()
+
+    
 
     return {
         "total": total,
@@ -211,13 +253,11 @@ def get_stats(
         filters += " AND created_at <= ?"
         params.append(parse_time(end))
 
-    # Histogram by event type
     histo = cur.execute(
         f"SELECT event_type, COUNT(*) as count FROM logs {filters} GROUP BY event_type",
         params,
     ).fetchall()
 
-    # Timeseries aggregation by bucket_minutes
     times = cur.execute(
         f"""
         SELECT 
@@ -241,24 +281,20 @@ def get_stats(
     }
 
 # -----------------------------
-# /export.csv - download logs
+# /export.csv - streaming CSV
 # -----------------------------
 @app.get("/export.csv")
 def export_logs():
     conn = get_db()
     cur = conn.cursor()
-    rows = cur.execute("SELECT * FROM logs ORDER BY created_at DESC").fetchall()
-    conn.close()
+    cur.execute("SELECT * FROM logs ORDER BY created_at DESC")
 
-    output = io.StringIO()
-    writer = csv.DictWriter(output, fieldnames=["id", "created_at", "event_type", "data"])
-    writer.writeheader()
-    for row in rows:
-        writer.writerow(dict(row))
+    def iter_csv():
+        writer = csv.writer(io.StringIO())
+        yield "id,created_at,event_type,data\n"
+        for row in cur:
+            yield f"{row['id']},{row['created_at']},{row['event_type']},{row['data']}\n"
 
-    response = StreamingResponse(
-        iter([output.getvalue()]),
-        media_type="text/csv",
-    )
+    response = StreamingResponse(iter_csv(), media_type="text/csv")
     response.headers["Content-Disposition"] = "attachment; filename=logs.csv"
     return response

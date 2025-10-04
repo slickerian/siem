@@ -1,38 +1,35 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from "react";
 import { toast } from "@/hooks/use-toast";
 
-// SIEM Components
-import { Header } from '@/components/siem/Header';
-import { StatsCards } from '@/components/siem/StatsCards';
-import { EventChart } from '@/components/siem/EventChart';
-import { EventTypeChart } from '@/components/siem/EventTypeChart';
-import { EventTableWrapper } from '@/components/siem/EventTableWrapper';
-import { FilterPanel } from '@/components/siem/FilterPanel';
+import { Header } from "@/components/siem/Header";
+import { StatsCards } from "@/components/siem/StatsCards";
+import { EventChart } from "@/components/siem/EventChart";
+import { EventTypeChart } from "@/components/siem/EventTypeChart";
+import { FilterPanel } from "@/components/siem/FilterPanel";
+import { EventTable } from "@/components/siem/EventTable";
 
-// Services
-import { siemApi, type StatsResponse, type LogsResponse } from '@/services/siemApi';
+import { siemApi, StatsResponse, LogsResponse, LogEntry } from "@/services/siemApi";
 
 const Index = () => {
   const [chartData, setChartData] = useState<{ bucket: string; count: number }[]>([]);
   const [stats, setStats] = useState<StatsResponse | null>(null);
-
   const [liveStats, setLiveStats] = useState({
     total: 0,
     critical: 0,
     last24h: 0,
     avgPerHour: 0,
   });
-
+  const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   const [filters, setFilters] = useState({
-    eventType: '',
-    timeRange: '24h',
-    startDate: '',
-    endDate: '',
+    eventType: "",
+    timeRange: "",
+    startDate: "",
+    endDate: "",
     bucketMinutes: 5,
   });
+  const [searchQuery, setSearchQuery] = useState("");
 
   const loadData = useCallback(async () => {
     try {
@@ -42,33 +39,37 @@ const Index = () => {
       const apiParams: any = { limit: 1000 };
       if (filters.eventType) apiParams.event_type = filters.eventType;
 
-      if (filters.timeRange && filters.timeRange !== 'custom') {
+      // Time range handling
+      if (filters.timeRange && filters.timeRange !== "custom") {
         const now = new Date();
-        let startTime: Date;
-
+        let startTime = new Date(0);
         switch (filters.timeRange) {
-          case '1h': startTime = new Date(now.getTime() - 60 * 60 * 1000); break;
-          case '6h': startTime = new Date(now.getTime() - 6 * 60 * 60 * 1000); break;
-          case '24h': startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000); break;
-          case '7d': startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); break;
-          default: startTime = new Date(0);
+          case "1h":
+            startTime = new Date(now.getTime() - 60 * 60 * 1000);
+            break;
+          case "6h":
+            startTime = new Date(now.getTime() - 6 * 60 * 60 * 1000);
+            break;
+          case "24h":
+            startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            break;
+          case "7d":
+            startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            break;
         }
-
-        apiParams.start = startTime.toISOString().replace('T', ' ').slice(0, 19);
-        apiParams.end = now.toISOString().replace('T', ' ').slice(0, 19);
-      } else if (filters.timeRange === 'custom' && filters.startDate && filters.endDate) {
-        apiParams.start = filters.startDate.replace('T', ' ');
-        apiParams.end = filters.endDate.replace('T', ' ');
+        apiParams.start = startTime.toISOString().replace("T", " ").slice(0, 19);
+        apiParams.end = now.toISOString().replace("T", " ").slice(0, 19);
+      } else if (filters.timeRange === "custom" && filters.startDate && filters.endDate) {
+        apiParams.start = filters.startDate.replace("T", " ");
+        apiParams.end = filters.endDate.replace("T", " ");
       }
 
-      // Fetch stats and chart data from backend
       const statsResponse = await siemApi.getStats({
         ...apiParams,
         bucket_minutes: filters.bucketMinutes,
       });
       setStats(statsResponse);
 
-      // Fetch live stats from backend (total, critical, last24h, avg/hour)
       const logsResponse: LogsResponse = await siemApi.getLogs(apiParams);
       setLiveStats({
         total: logsResponse.total,
@@ -76,16 +77,14 @@ const Index = () => {
         last24h: logsResponse.last24h,
         avgPerHour: logsResponse.avgPerHour,
       });
-
-      // Update chart data
       setChartData(statsResponse.timeseries);
-
+      setLogs(logsResponse.items);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load data';
-      setError(errorMessage);
+      const msg = err instanceof Error ? err.message : "Failed to load data";
+      setError(msg);
       toast({
         title: "Error loading data",
-        description: errorMessage,
+        description: msg,
         variant: "destructive",
       });
     } finally {
@@ -93,42 +92,52 @@ const Index = () => {
     }
   }, [filters]);
 
+  // Initial load
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  const handleFiltersChange = (newFilters: Partial<typeof filters>) =>
-    setFilters(prev => ({ ...prev, ...newFilters }));
-
-  const handleApplyFilters = () => loadData();
-
-  const handleResetFilters = () =>
-    setFilters({
-      eventType: '',
-      timeRange: '24h',
-      startDate: '',
-      endDate: '',
-      bucketMinutes: 5,
+  // WebSocket for live logs
+  useEffect(() => {
+    const ws = siemApi.connectWebSocket((log: LogEntry & {
+      total: number;
+      critical: number;
+      last24h: number;
+      avgPerHour: number;
+    }) => {
+      setLogs((prev) => [log, ...prev]); // prepend new log
+      setLiveStats({
+        total: log.total,
+        critical: log.critical,
+        last24h: log.last24h,
+        avgPerHour: log.avgPerHour,
+      });
     });
 
-  const handleExport = () => {
-    const exportParams: any = {};
-    if (filters.eventType) exportParams.event_type = filters.eventType;
-    window.open(siemApi.getExportUrl(exportParams), '_blank');
-  };
+    return () => ws.close();
+  }, []);
+
+
+  const handleFiltersChange = (newFilters: Partial<typeof filters>) =>
+    setFilters((prev) => ({ ...prev, ...newFilters }));
+  const handleApplyFilters = () => loadData();
+  const handleResetFilters = () =>
+    setFilters({ eventType: "", timeRange: "24h", startDate: "", endDate: "", bucketMinutes: 5 });
+  const handleExport = () =>
+    window.open(siemApi.getExportUrl({ event_type: filters.eventType }), "_blank");
 
   const activeFiltersCount = Object.values(filters).filter(
-    v => v !== '' && v !== 5 && v !== '24h'
+    (v) => v !== "" && v !== 5 && v !== "24h"
   ).length;
 
-  if (error) {
+  if (error)
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
           <div className="text-destructive text-4xl">⚠️</div>
           <h1 className="text-2xl font-bold text-foreground">Connection Error</h1>
           <p className="text-muted-foreground max-w-md">
-            Unable to connect to the SIEM server. Please ensure the Python backend is running on localhost:8000.
+            Unable to connect to the SIEM server. Please ensure the backend is running.
           </p>
           <button
             onClick={loadData}
@@ -139,17 +148,12 @@ const Index = () => {
         </div>
       </div>
     );
-  }
 
   return (
     <div className="min-h-screen bg-background">
-      <Header
-        onExport={handleExport}
-        isConnected={true}
-        totalEvents={liveStats.total}
-      />
-
+      <Header onExport={handleExport} isConnected={true} totalEvents={liveStats.total} />
       <main className="container mx-auto px-6 py-6 space-y-6">
+        {/* Filters */}
         <FilterPanel
           filters={filters}
           onFiltersChange={handleFiltersChange}
@@ -158,19 +162,28 @@ const Index = () => {
           activeFiltersCount={activeFiltersCount}
         />
 
+        {/* Stats */} 
         <StatsCards stats={liveStats} />
 
+        {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <EventChart data={chartData} />
           <EventTypeChart data={stats?.histogram || []} />
         </div>
 
-        <EventTableWrapper
-          onChartDataUpdate={setChartData}
-          onStatsUpdate={(total, critical, last24h, avgPerHour) =>
-            setLiveStats({ total, critical, last24h, avgPerHour })
-          }
-        />
+        {/* Raw Logs Table */}
+        <div className="mt-8">
+          <h2 className="text-xl font-semibold mb-2">Raw Logs</h2>
+          <EventTable
+            data={logs.filter(
+              (log) =>
+                log.event_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                log.data.toLowerCase().includes(searchQuery.toLowerCase())
+            )}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+          />
+        </div>
       </main>
     </div>
   );
