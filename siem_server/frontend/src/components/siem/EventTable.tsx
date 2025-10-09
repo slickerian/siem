@@ -51,14 +51,12 @@ export function EventTable({ data, searchQuery, onSearchChange }) {
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     onSortingChange: setSorting,
-    state: {
-      sorting,
-    },
+    state: { sorting },
   });
 
   return (
-    <div className="w-full">
-      {/* 🔎 Search bar (UI only, logic in wrapper) */}
+    <div className="w-full relative">
+      {/* 🔎 Search bar */}
       <div className="mb-2">
         <input
           type="text"
@@ -75,7 +73,8 @@ export function EventTable({ data, searchQuery, onSearchChange }) {
       </div>
 
       <div className="border border-border rounded-lg overflow-hidden">
-        <div className="max-h-[500px] overflow-y-auto">
+        {/* Scrollable container with hidden scrollbar */}
+        <div className="max-h-[500px] overflow-y-auto scrollbar-none">
           <table className="min-w-full border-collapse">
             <thead className="sticky top-0 z-10 bg-muted/50">
               {table.getHeaderGroups().map((headerGroup) => (
@@ -93,6 +92,7 @@ export function EventTable({ data, searchQuery, onSearchChange }) {
                 </tr>
               ))}
             </thead>
+
             <tbody>
               {table.getRowModel().rows.length ? (
                 table.getRowModel().rows.map((row) => (

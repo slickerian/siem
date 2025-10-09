@@ -46,8 +46,10 @@
 
 # --- Project-specific ---
 **/docs/
-commands.txt
+**commands.txt
 **siem.db
+**siem1.db
+**changes_to_do.txt
 
 # Logs
 logs

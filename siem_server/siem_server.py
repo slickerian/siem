@@ -96,14 +96,19 @@ async def broadcast(payload: dict):
 # -----------------------------
 @app.post("/log")
 async def ingest_log(log: LogIn):
-    now = datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()
+    from datetime import datetime, timezone, timedelta
+
+    # Current UTC time (aware)
+    now_dt = datetime.now(timezone.utc)
+    now_iso = now_dt.isoformat()
+
     conn = get_db()
     cur = conn.cursor()
 
     # Insert the new log
     cur.execute(
         "INSERT INTO logs (created_at, event_type, data) VALUES (?, ?, ?)",
-        (now, log.event_type, log.data),
+        (now_iso, log.event_type, log.data),
     )
     conn.commit()
 
@@ -116,21 +121,25 @@ async def ingest_log(log: LogIn):
     ).fetchone()[0]
 
     # Last 24h logs
-    since = (datetime.utcnow() - timedelta(hours=24)).replace(tzinfo=timezone.utc).isoformat()
+    since_dt = now_dt - timedelta(hours=24)
     last24h_count = cur.execute(
-        "SELECT COUNT(*) FROM logs WHERE created_at >= ?", (since,)
+        "SELECT COUNT(*) FROM logs WHERE created_at >= ?", (since_dt.isoformat(),)
     ).fetchone()[0]
 
     # Average per hour
-    first_log_time = cur.execute("SELECT MIN(created_at) FROM logs").fetchone()[0]
-    first_log_time = datetime.fromisoformat(first_log_time) if first_log_time else datetime.utcnow()
-    hours_elapsed = max(1, (datetime.utcnow() - first_log_time).total_seconds() / 3600)
+    first_log_time_row = cur.execute("SELECT MIN(created_at) FROM logs").fetchone()[0]
+    first_log_time = datetime.fromisoformat(first_log_time_row) if first_log_time_row else now_dt
+
+    # Ensure timezone-aware
+    first_log_time_aware = first_log_time if first_log_time.tzinfo else first_log_time.replace(tzinfo=timezone.utc)
+
+    hours_elapsed = max(1, (now_dt - first_log_time_aware).total_seconds() / 3600)
     avg_per_hour = round(total_count / hours_elapsed)
 
     payload = {
         "event_type": log.event_type,
         "data": log.data,
-        "created_at": now,
+        "created_at": now_iso,
         "total": total_count,
         "critical": critical_count,
         "last24h": last24h_count,
@@ -140,6 +149,7 @@ async def ingest_log(log: LogIn):
     await broadcast(payload)
     conn.close()
     return {"status": "ok"}
+
 
 
 # -----------------------------
@@ -245,7 +255,13 @@ def get_logs(
         stats_params,
     ).fetchone()[0]
     first_log_time = datetime.fromisoformat(first_log_time_row) if first_log_time_row else datetime.utcnow()
-    hours_elapsed = max(1, (datetime.utcnow() - first_log_time).total_seconds() / 3600)
+
+    now = datetime.now(timezone.utc)
+    first_log_time_aware = (
+        first_log_time if first_log_time.tzinfo else first_log_time.replace(tzinfo=timezone.utc)
+    )
+    hours_elapsed = max(1, (now - first_log_time_aware).total_seconds() / 3600)
+    
     avg_per_hour = round(total / hours_elapsed)
 
     conn.close()
