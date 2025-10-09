@@ -171,6 +171,7 @@ def get_logs(
     conn = get_db()
     cur = conn.cursor()
 
+    # Base query for fetching logs
     query = "SELECT * FROM logs WHERE 1=1"
     params: List = []
 
@@ -191,29 +192,63 @@ def get_logs(
     params.extend([limit, offset])
     rows = cur.execute(query, params).fetchall()
 
-    total = cur.execute("SELECT COUNT(*) FROM logs").fetchone()[0]
-    since = (datetime.utcnow() - timedelta(hours=24)).replace(tzinfo=timezone.utc).isoformat()
-    last24h = cur.execute(
-        "SELECT COUNT(*) FROM logs WHERE created_at >= ?", (since,)
-    ).fetchone()[0]
+    # ✅ Build base condition for stats (same filters)
+    base_query = "FROM logs WHERE 1=1"
+    stats_params: List = []
 
+    if event_type:
+        base_query += " AND event_type = ?"
+        stats_params.append(event_type)
+    if q:
+        base_query += " AND (LOWER(event_type) LIKE LOWER(?) OR LOWER(data) LIKE LOWER(?))"
+        stats_params.extend([f"%{q}%", f"%{q}%"])
+    if start:
+        base_query += " AND created_at >= ?"
+        stats_params.append(parse_time(start))
+    if end:
+        base_query += " AND created_at <= ?"
+        stats_params.append(parse_time(end))
+
+    # ✅ Stats now respect filters
+    total = cur.execute(f"SELECT COUNT(*) {base_query}", stats_params).fetchone()[0]
+
+
+    # Build separate query for critical that ignores event_type but keeps q/start/end
+    critical_query = "FROM logs WHERE 1=1"
+    critical_params: List = []
+
+    if q:
+        critical_query += " AND (LOWER(event_type) LIKE LOWER(?) OR LOWER(data) LIKE LOWER(?))"
+        critical_params.extend([f"%{q}%", f"%{q}%"])
+    if start:
+        critical_query += " AND created_at >= ?"
+        critical_params.append(parse_time(start))
+    if end:
+        critical_query += " AND created_at <= ?"
+        critical_params.append(parse_time(end))
 
     critical = cur.execute(
-        "SELECT COUNT(*) FROM logs WHERE UPPER(TRIM(event_type)) IN ('ERROR', 'CRITICAL', 'FAIL', 'ACTION_FAILED')"
+        f"SELECT COUNT(*) {critical_query} AND UPPER(TRIM(event_type)) IN ('ERROR','CRITICAL','FAIL','ACTION_FAILED')",
+        critical_params,
     ).fetchone()[0]
 
-        
 
-    first_log_time = cur.execute("SELECT MIN(created_at) FROM logs").fetchone()[0]
-    first_log_time = datetime.fromisoformat(first_log_time) if first_log_time else datetime.utcnow()
+
+    since = (datetime.utcnow() - timedelta(hours=24)).replace(tzinfo=timezone.utc).isoformat()
+    last24h = cur.execute(
+        f"SELECT COUNT(*) {base_query} AND created_at >= ?",
+        stats_params + [since],
+    ).fetchone()[0]
+
+    first_log_time_row = cur.execute(
+        f"SELECT MIN(created_at) {base_query}",
+        stats_params,
+    ).fetchone()[0]
+    first_log_time = datetime.fromisoformat(first_log_time_row) if first_log_time_row else datetime.utcnow()
     hours_elapsed = max(1, (datetime.utcnow() - first_log_time).total_seconds() / 3600)
     avg_per_hour = round(total / hours_elapsed)
 
-    # print([dict(row) for row in rows[:10]])  # 👈 only first 5 logs
-
     conn.close()
-
-    
 
     return {
         "total": total,
@@ -222,6 +257,7 @@ def get_logs(
         "avgPerHour": avg_per_hour,
         "items": [dict(row) for row in rows],
     }
+
 
 # -----------------------------
 # /api/stats - stats for charts

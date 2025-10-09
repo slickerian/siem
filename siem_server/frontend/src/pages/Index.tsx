@@ -38,6 +38,7 @@ const Index = () => {
 
       const apiParams: any = { limit: 1000 };
       if (filters.eventType) apiParams.event_type = filters.eventType;
+      if (searchQuery) apiParams.q = searchQuery;
 
       // Time range handling
       if (filters.timeRange && filters.timeRange !== "custom") {
@@ -90,12 +91,21 @@ const Index = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [filters]);
+  }, [filters, searchQuery ]);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      loadData();
+    }, 400); // debounce for smoother typing
+
+    return () => clearTimeout(timeout);
+  }, [loadData, searchQuery]);
+
 
   // Initial load
   useEffect(() => {
     loadData();
-  }, [loadData]);
+  }, [loadData, searchQuery]);
 
   // WebSocket for live logs
   useEffect(() => {
@@ -105,17 +115,64 @@ const Index = () => {
       last24h: number;
       avgPerHour: number;
     }) => {
-      setLogs((prev) => [log, ...prev]); // prepend new log
+      // 🧠 Respect current filters and search
+      const matchesEventType =
+        !filters.eventType ||
+        log.event_type.toLowerCase() === filters.eventType.toLowerCase();
+
+      const matchesSearch =
+        !searchQuery ||
+        log.event_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        log.data.toLowerCase().includes(searchQuery.toLowerCase());
+
+      if (!matchesEventType || !matchesSearch) return; // ignore unrelated logs
+
+      // ✅ Update log list
+      setLogs((prev) => [log, ...prev.slice(0, 999)]);
+
+      // ✅ Update stats cards
       setLiveStats({
         total: log.total,
         critical: log.critical,
         last24h: log.last24h,
         avgPerHour: log.avgPerHour,
       });
+
+      // ✅ Update time-series graph (for visible logs only)
+      setChartData((prev) => {
+        const nowBucket = new Date().toISOString().slice(0, 16) + ":00";
+        const updated = [...prev];
+        const idx = updated.findIndex((p) => p.bucket === nowBucket);
+
+        if (idx >= 0) {
+          updated[idx] = { ...updated[idx], count: updated[idx].count + 1 };
+        } else {
+          updated.push({ bucket: nowBucket, count: 1 });
+        }
+
+        return updated.slice(-200); // keep only recent points
+      });
+
+      // ✅ Update event-type histogram
+      setStats((prev) => {
+        if (!prev) return prev;
+        const updatedHisto = [...prev.histogram];
+        const idx = updatedHisto.findIndex((h) => h.event_type === log.event_type);
+        if (idx >= 0) {
+          updatedHisto[idx] = {
+            ...updatedHisto[idx],
+            count: updatedHisto[idx].count + 1,
+          };
+        } else {
+          updatedHisto.push({ event_type: log.event_type, count: 1 });
+        }
+        return { ...prev, histogram: updatedHisto };
+      });
     });
 
     return () => ws.close();
-  }, []);
+  }, [filters.eventType, searchQuery]);
+
 
 
   const handleFiltersChange = (newFilters: Partial<typeof filters>) =>
