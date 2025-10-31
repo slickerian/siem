@@ -3,6 +3,7 @@ const API_BASE_URL = import.meta.env.VITE_SIEM_API_URL || 'http://localhost:8000
 
 export interface LogEntry {
   id: number;
+  node_id: string;
   created_at: string;
   event_type: string;
   data: string;
@@ -11,7 +12,6 @@ export interface LogEntry {
   last24h?: number;
   avgPerHour?: number;
 }
-
 
 export interface StatsResponse {
   histogram: Array<{ event_type: string; count: number }>;
@@ -26,6 +26,11 @@ export interface LogsResponse {
   last24h: number;
   avgPerHour: number;
   items: LogEntry[];
+}
+
+export interface NodeStatus {
+  node_id: string;
+  online: boolean;
 }
 
 export class SiemApiError extends Error {
@@ -64,6 +69,7 @@ export const siemApi = {
   async getLogs(params: {
     limit?: number;
     offset?: number;
+    node_id?: string;
     event_type?: string;
     q?: string;
     start?: string;
@@ -74,6 +80,7 @@ export const siemApi = {
   },
 
   async getStats(params: {
+    node_id?: string;
     event_type?: string;
     q?: string;
     start?: string;
@@ -84,7 +91,11 @@ export const siemApi = {
     return apiRequest<StatsResponse>(`/api/stats${query ? `?${query}` : ''}`);
   },
 
-  getExportUrl(params: { event_type?: string; q?: string; start?: string; end?: string } = {}) {
+  async getNodes(): Promise<NodeStatus[]> {
+    return apiRequest<NodeStatus[]>('/api/nodes');
+  },
+
+  getExportUrl(params: { node_id?: string; event_type?: string; q?: string; start?: string; end?: string } = {}) {
     const query = buildQuery(params);
     return `${API_BASE_URL}/export.csv${query ? `?${query}` : ''}`;
   },
@@ -100,19 +111,52 @@ export const siemApi = {
 
   connectWebSocket(onMessage: (log: LogEntry) => void): WebSocket {
     const wsUrl = API_BASE_URL.replace(/^http/, 'ws') + '/ws/logs';
-    const ws = new WebSocket(wsUrl);
+    let ws: WebSocket;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
+    const reconnectDelay = 1000; // Start with 1 second
 
-    ws.onmessage = (event) => {
-      try {
-        const log = JSON.parse(event.data) as LogEntry;
-        onMessage(log);
-      } catch (err) {
-        console.error('WS parse error:', err);
-      }
+    const connect = () => {
+      console.log(`[WS] Connecting to ${wsUrl} (attempt ${reconnectAttempts + 1})`);
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        console.log('[WS] Connection established');
+        reconnectAttempts = 0; // Reset on successful connection
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const log = JSON.parse(event.data) as LogEntry;
+          onMessage(log);
+        } catch (err) {
+          console.error('[WS] Parse error:', err);
+        }
+      };
+
+      ws.onerror = (err) => {
+        console.error('[WS] WebSocket error:', err);
+      };
+
+      ws.onclose = (event) => {
+        console.log(`[WS] Connection closed: ${event.code} ${event.reason}`);
+
+        // Attempt reconnection if not a normal closure and under max attempts
+        if (event.code !== 1000 && reconnectAttempts < maxReconnectAttempts) {
+          reconnectAttempts++;
+          const delay = reconnectDelay * Math.pow(2, reconnectAttempts - 1); // Exponential backoff
+          console.log(`[WS] Attempting reconnection in ${delay}ms (attempt ${reconnectAttempts}/${maxReconnectAttempts})`);
+
+          setTimeout(() => {
+            connect();
+          }, delay);
+        } else if (reconnectAttempts >= maxReconnectAttempts) {
+          console.error('[WS] Max reconnection attempts reached');
+        }
+      };
     };
 
-    ws.onerror = (err) => console.error('WebSocket error:', err);
-
+    connect();
     return ws;
   },
 };
