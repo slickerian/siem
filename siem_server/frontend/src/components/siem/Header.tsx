@@ -31,12 +31,6 @@ export function Header({ onExport, isConnected, totalEvents, nodes, selectedNode
             </div>
           </div>
           
-          <div className="flex items-center gap-2 ml-8">
-            <div className={`status-indicator ${isConnected ? 'bg-primary' : 'bg-destructive'} animate-pulse-slow`} />
-            <span className="text-sm text-muted-foreground">
-              {isConnected ? 'Connected' : 'Disconnected'}
-            </span>
-          </div>
         </div>
 
         {/* Right section: active node display, export, and settings */}
