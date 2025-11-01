@@ -127,6 +127,52 @@
     background: hsl(var(--background));
   }
 
+  /* Ensure text is visible in both themes */
+  h1, h2, h3, h4, h5, h6 {
+    @apply text-foreground;
+  }
+
+  p, span, div {
+    color: hsl(var(--foreground));
+  }
+
+  /* Chart text visibility */
+  .recharts-text {
+    fill: hsl(var(--foreground)) !important;
+  }
+
+  .recharts-cartesian-axis-tick-value {
+    fill: hsl(var(--muted-foreground)) !important;
+  }
+
+  .recharts-tooltip-wrapper {
+    outline: none;
+  }
+
+  /* Table text visibility */
+  table {
+    color: hsl(var(--foreground));
+  }
+
+  th, td {
+    color: hsl(var(--foreground));
+  }
+
+  /* Input field text visibility */
+  input, textarea, select {
+    color: hsl(var(--foreground));
+    background: hsl(var(--input));
+  }
+
+  input::placeholder, textarea::placeholder {
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* Badge text visibility */
+  .badge {
+    color: hsl(var(--foreground));
+  }
+
   /* SIEM specific utilities */
   .siem-card {
     @apply bg-card border border-border rounded-lg p-6 shadow-lg;

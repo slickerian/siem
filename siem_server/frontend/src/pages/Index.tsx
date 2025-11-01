@@ -256,12 +256,6 @@ const Index = () => {
           <EventTypeChart data={stats?.histogram || []} />
         </div>
 
-        {/* Debug info - remove this after testing */}
-        <div className="text-xs text-muted-foreground p-2 bg-muted rounded space-y-1">
-          <div>Debug: chartData has {chartData.length} points, stats histogram has {(stats?.histogram || []).length} types</div>
-          <div>Last chart refresh: {lastChartUpdate ? lastChartUpdate.toLocaleTimeString() : 'Never'}</div>
-          <div>Nodes: {nodes.length} total, {nodes.filter(n => n.online).length} online</div>
-        </div>
 
         {/* Raw Logs Table */}
         <div className="mt-8">

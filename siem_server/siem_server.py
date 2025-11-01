@@ -235,6 +235,8 @@ async def ingest_log(log: LogIn):
 
     now = datetime.now(timezone.utc)
     now_iso = now.isoformat()
+    ist_time = now + timedelta(hours=5, minutes=30)  # Kolkata is UTC+5:30
+    logger.debug(f"Current UTC time: {now}, IST time: {ist_time}, ISO format: {now_iso}")
     node_status[log.node_id] = now  # update last seen
 
     try:
@@ -262,6 +264,7 @@ async def ingest_log(log: LogIn):
         "event_type": log.event_type,
         "data": log.data,
         "created_at": now_iso,
+        "timestamp_local": now.astimezone().isoformat(),  # Include local time for display
         "total": stats['total_logs'],
         "critical": stats['critical_count'],
         "last24h": stats['last24h_count'],

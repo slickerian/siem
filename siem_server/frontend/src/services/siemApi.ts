@@ -5,6 +5,7 @@ export interface LogEntry {
   id: number;
   node_id: string;
   created_at: string;
+  timestamp_local?: string; // Local timezone version for display
   event_type: string;
   data: string;
   total?: number;

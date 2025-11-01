@@ -28,7 +28,20 @@ export function EventTable({ data, searchQuery, onSearchChange }) {
     {
       accessorKey: "created_at",
       header: "Timestamp",
-      cell: (info) => new Date(info.getValue()).toLocaleString(),
+      cell: (info) => {
+        const utcDate = new Date(info.getValue());
+        // Convert UTC to Kolkata time (IST, UTC+5:30)
+        const istDate = new Date(utcDate.getTime() + (5.5 * 60 * 60 * 1000)); // Add 5.5 hours
+        return istDate.toLocaleString('en-IN', {
+          timeZone: 'Asia/Kolkata',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+      },
     },
     {
       accessorKey: "event_type",
