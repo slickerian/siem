@@ -4,13 +4,42 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { useState } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 
 export function EventTable({ data, searchQuery, onSearchChange }) {
   const [sorting, setSorting] = useState([]);
+  const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
 
-  const getSeverityVariant = (eventType) => {
+  // Update local search when prop changes (for external updates)
+  useEffect(() => {
+    setLocalSearchQuery(searchQuery);
+  }, [searchQuery]);
+
+  // Debounce local search query to avoid excessive filtering and parent re-renders
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(localSearchQuery);
+      onSearchChange(localSearchQuery); // Only notify parent with debounced value
+    }, 150); // Reduced to 150ms for smoother feel
+
+    return () => clearTimeout(timer);
+  }, [localSearchQuery, onSearchChange]);
+
+  // Memoize filtered data to avoid re-filtering on every render
+  const filteredData = useMemo(() => {
+    if (!debouncedSearchQuery) return data;
+
+    const query = debouncedSearchQuery.toLowerCase();
+    return data.filter(
+      (log) =>
+        log.event_type.toLowerCase().includes(query) ||
+        log.data.toLowerCase().includes(query)
+    );
+  }, [data, debouncedSearchQuery]);
+
+  const getSeverityVariant = useCallback((eventType) => {
     const type = eventType?.toUpperCase() || "";
     if (type.includes("ERROR") || type.includes("CRITICAL") || type.includes("FAIL")) {
       return "destructive";
@@ -22,9 +51,9 @@ export function EventTable({ data, searchQuery, onSearchChange }) {
       return "outline";
     }
     return "default";
-  };
+  }, []);
 
-  const columns = [
+  const columns = useMemo(() => [
     {
       accessorKey: "created_at",
       header: "Timestamp",
@@ -56,10 +85,10 @@ export function EventTable({ data, searchQuery, onSearchChange }) {
       accessorKey: "data",
       header: "Message",
     },
-  ];
+  ], [getSeverityVariant]);
 
   const table = useReactTable({
-    data,
+    data: filteredData,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -73,8 +102,8 @@ export function EventTable({ data, searchQuery, onSearchChange }) {
       <div className="mb-2">
         <input
           type="text"
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
+          value={localSearchQuery}
+          onChange={(e) => setLocalSearchQuery(e.target.value)}
           placeholder="Search logs..."
           className="
             w-full p-2 rounded-md border border-border text-sm

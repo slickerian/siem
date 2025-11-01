@@ -261,11 +261,7 @@ const Index = () => {
         <div className="mt-8">
           <h2 className="text-xl font-semibold mb-2">Raw Logs</h2>
           <EventTable
-            data={logs.filter(
-              (log) =>
-                log.event_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                log.data.toLowerCase().includes(searchQuery.toLowerCase())
-            )}
+            data={logs}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
           />
