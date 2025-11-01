@@ -94,9 +94,10 @@ def get_cached_stats() -> Dict[str, int]:
         ).fetchone()
         critical_count = row[0] if row else 0
 
-        # Last 24h logs - use proper datetime comparison
+        # Last 24h logs - convert to IST for comparison since logs are stored in IST
         since = now - timedelta(hours=24)
-        row = cur.execute("SELECT COUNT(*) FROM logs WHERE datetime(created_at) >= datetime(?)", (since.isoformat(),)).fetchone()
+        since_ist = since + timedelta(hours=5, minutes=30)  # Convert UTC to IST for comparison
+        row = cur.execute("SELECT COUNT(*) FROM logs WHERE datetime(created_at) >= datetime(?)", (since_ist.isoformat(),)).fetchone()
         last24h_count = row[0] if row else 0
 
         # Average per hour - calculate based on last 24h activity for more accuracy
@@ -233,11 +234,17 @@ async def ingest_log(log: LogIn):
         logger.warning(f"Field too long: node_id={len(log.node_id)}, event_type={len(log.event_type)}")
         raise HTTPException(status_code=400, detail="node_id and event_type must be <= 100 characters")
 
-    now = datetime.now(timezone.utc)
-    now_iso = now.isoformat()
-    ist_time = now + timedelta(hours=5, minutes=30)  # Kolkata is UTC+5:30
-    logger.debug(f"Current UTC time: {now}, IST time: {ist_time}, ISO format: {now_iso}")
-    node_status[log.node_id] = now  # update last seen
+    # Always use Kolkata timezone (IST, UTC+5:30) for timestamps regardless of node timezone
+    ist_offset = timedelta(hours=5, minutes=30)
+    now_ist = datetime.now(timezone.utc) + ist_offset
+    now_ist = now_ist.replace(tzinfo=timezone(ist_offset))  # Make it timezone-aware IST
+    now_iso = now_ist.isoformat()
+
+    # Keep UTC for node status tracking
+    now_utc = datetime.now(timezone.utc)
+    node_status[log.node_id] = now_utc
+
+    logger.debug(f"Log timestamp set to IST: {now_ist}, ISO format: {now_iso}")
 
     try:
         # Insert the new log using database manager
@@ -263,8 +270,8 @@ async def ingest_log(log: LogIn):
         "node_id": log.node_id,
         "event_type": log.event_type,
         "data": log.data,
-        "created_at": now_iso,
-        "timestamp_local": now.astimezone().isoformat(),  # Include local time for display
+        "created_at": now_iso,  # Now in IST
+        "timestamp_local": now_iso,  # IST for display
         "total": stats['total_logs'],
         "critical": stats['critical_count'],
         "last24h": stats['last24h_count'],
@@ -459,13 +466,14 @@ def get_stats(
     histo_query = f"SELECT event_type, COUNT(*) as count FROM logs {filters} GROUP BY event_type"
     histo = db_manager.execute_query(histo_query, params)
 
-    # Time series data (bucketed by minute) - proper datetime handling
+    # Time series data (bucketed by minute) - handle IST timestamps properly
+    # Since logs are stored with IST timestamps, we need to bucket them correctly
     times_query = f"""
     SELECT
-        strftime('%Y-%m-%d %H:%M:00', created_at) as bucket,
+        strftime('%Y-%m-%d %H:%M:00', datetime(created_at, 'localtime')) as bucket,
         COUNT(*) as count
     FROM logs {filters}
-    GROUP BY strftime('%Y-%m-%d %H:%M:00', created_at)
+    GROUP BY strftime('%Y-%m-%d %H:%M:00', datetime(created_at, 'localtime'))
     ORDER BY bucket
     """
     times = db_manager.execute_query(times_query, params)

@@ -58,9 +58,8 @@ export function EventTable({ data, searchQuery, onSearchChange }) {
       accessorKey: "created_at",
       header: "Timestamp",
       cell: (info) => {
-        const utcDate = new Date(info.getValue());
-        // Convert UTC to Kolkata time (IST, UTC+5:30)
-        const istDate = new Date(utcDate.getTime() + (5.5 * 60 * 60 * 1000)); // Add 5.5 hours
+        // The timestamp is already in IST from the server, just format it
+        const istDate = new Date(info.getValue());
         return istDate.toLocaleString('en-IN', {
           timeZone: 'Asia/Kolkata',
           year: 'numeric',

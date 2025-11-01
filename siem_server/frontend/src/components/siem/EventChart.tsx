@@ -31,9 +31,8 @@ export function EventChart({ data }: EventChartProps) {
 
   const formatTime = (bucket: string) => {
     try {
-      // Parse UTC time and convert to Kolkata time (IST, UTC+5:30)
-      const utcDate = new Date(bucket + (bucket.includes('Z') ? '' : 'Z')); // Ensure UTC
-      const istDate = new Date(utcDate.getTime() + (5.5 * 60 * 60 * 1000)); // Add 5.5 hours
+      // The bucket is already in IST format from the server, just format it
+      const istDate = new Date(bucket);
 
       return istDate.toLocaleTimeString("en-IN", {
         timeZone: 'Asia/Kolkata',
