@@ -1,4 +1,4 @@
-# core/logger.py 
+# core/logger.py
 import os
 import base64
 import time
@@ -13,8 +13,11 @@ INCIDENT_LOG_FILE = os.path.join(LOG_DIR, "incidents.enc")
 KEY_FILE = os.path.join(LOG_DIR, "logging_key.bin")
 
 # ✅ Server endpoint and API key
-SERVER_URL = "http://192.168.1.2:8000/log"
-API_KEY = "secretkey"                   # must match server config
+SERVER_URL = "http://192.168.1.6:8000/log"
+API_KEY = "secretkey"  # must match server config
+
+# Each node identifies itself
+NODE_ID = os.uname().nodename  # or any unique string per node
 
 class EncryptedLogger:
     def __init__(self):
@@ -51,6 +54,7 @@ class EncryptedLogger:
             requests.post(
                 SERVER_URL,
                 json={
+                    "node_id": NODE_ID,
                     "event_type": str(event_type),
                     "data": str(data),
                     "encrypted": base64.b64encode(encrypted).decode()
