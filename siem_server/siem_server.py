@@ -61,6 +61,12 @@ class LogEntry(BaseModel):
     event_type: str
     data: str
 
+class NodeSettings(BaseModel):
+    node_id: str
+    name: str
+    enable_log_collection: bool
+    log_send_interval: int
+
 # -----------------------------
 # Helpers
 # -----------------------------
@@ -328,6 +334,53 @@ def get_nodes():
 
     logger.debug(f"Returning {len(nodes)} nodes")
     return nodes
+
+# -----------------------------
+# /api/nodes/{node_id}/settings - get node settings
+# -----------------------------
+@app.get("/api/nodes/{node_id}/settings")
+def get_node_settings(node_id: str):
+    logger.debug(f"Fetching settings for node {node_id}")
+    row = db_manager.execute_query("SELECT * FROM nodes WHERE node_id = ?", (node_id,))
+
+    if not row:
+        # Return default settings if node not found
+        return {
+            "node_id": node_id,
+            "name": node_id,
+            "enable_log_collection": True,
+            "log_send_interval": 30
+        }
+
+    settings = dict(row[0])
+    return settings
+
+# -----------------------------
+# /api/nodes/{node_id}/settings - update node settings
+# -----------------------------
+@app.put("/api/nodes/{node_id}/settings")
+def update_node_settings(node_id: str, settings: NodeSettings):
+    logger.info(f"Updating settings for node {node_id}")
+
+    # Validate input
+    if settings.node_id != node_id:
+        raise HTTPException(status_code=400, detail="node_id mismatch")
+
+    if len(settings.name) > 100:
+        raise HTTPException(status_code=400, detail="name must be <= 100 characters")
+
+    if settings.log_send_interval < 1 or settings.log_send_interval > 3600:
+        raise HTTPException(status_code=400, detail="log_send_interval must be between 1 and 3600 seconds")
+
+    # Update or insert
+    now = datetime.now(timezone.utc).isoformat()
+    db_manager.execute_query("""
+        INSERT OR REPLACE INTO nodes (node_id, name, enable_log_collection, log_send_interval, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+    """, (node_id, settings.name, settings.enable_log_collection, settings.log_send_interval, now), fetch=False)
+
+    logger.info(f"Settings updated for node {node_id}")
+    return {"status": "ok"}
 
 # -----------------------------
 # /api/logs - fetch logs (supports node_id)

@@ -14,10 +14,22 @@ KEY_FILE = os.path.join(LOG_DIR, "logging_key.bin")
 
 # ✅ Server endpoint and API key
 SERVER_URL = "http://192.168.1.6:8000/log"
+SETTINGS_URL = "http://192.168.1.6:8000/api/nodes/{}/settings"
 API_KEY = "secretkey"  # must match server config
 
 # Each node identifies itself
 NODE_ID = os.uname().nodename  # or any unique string per node
+
+# Settings cache
+settings_cache = {
+    'enable_log_collection': True,
+    'log_send_interval': 30,
+    'last_fetched': 0
+}
+
+# Log buffer for batch sending
+log_buffer = []
+last_send_time = 0
 
 class EncryptedLogger:
     def __init__(self):
@@ -32,6 +44,26 @@ class EncryptedLogger:
             with open(KEY_FILE, 'rb') as kf:
                 key = kf.read()
         self.key = key
+
+    def fetch_settings(self):
+        """Fetch settings from server periodically"""
+        global settings_cache
+        now = time.time()
+        if now - settings_cache['last_fetched'] < 60:  # Fetch every 60 seconds
+            return
+
+        try:
+            response = requests.get(SETTINGS_URL.format(NODE_ID), timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                settings_cache.update({
+                    'enable_log_collection': data.get('enable_log_collection', True),
+                    'log_send_interval': data.get('log_send_interval', 30),
+                    'last_fetched': now
+                })
+                print(f"[Logger] Settings updated: {settings_cache}")
+        except Exception as e:
+            print(f"[Logger] Could not fetch settings: {e}")
 
     def log(self, event_type, data):
         """Normal encrypted log entry + send to server."""
@@ -49,21 +81,35 @@ class EncryptedLogger:
         with open(file_path, 'a') as lf:
             lf.write(base64.b64encode(encrypted).decode() + "\n")
 
-        # also send to server
-        try:
-            requests.post(
-                SERVER_URL,
-                json={
-                    "node_id": NODE_ID,
-                    "event_type": str(event_type),
-                    "data": str(data),
-                    "encrypted": base64.b64encode(encrypted).decode()
-                },
-                headers={"X-API-Key": API_KEY},
-                timeout=3
-            )
-        except Exception as e:
-            print(f"[Logger Warning] Could not send log to server: {e}")
+        # Fetch settings if needed
+        self.fetch_settings()
+
+        # Buffer log for sending
+        if settings_cache['enable_log_collection']:
+            log_buffer.append({
+                "node_id": NODE_ID,
+                "event_type": str(event_type),
+                "data": str(data),
+                "encrypted": base64.b64encode(encrypted).decode()
+            })
+            self._send_buffered_logs_if_needed()
+        else:
+            print(f"[Logger] Log collection disabled, skipping buffer for {event_type}")
+
+    def _send_buffered_logs_if_needed(self):
+        """Send buffered logs if interval has passed"""
+        global last_send_time, log_buffer
+        now = time.time()
+        if now - last_send_time >= settings_cache['log_send_interval'] and log_buffer:
+            try:
+                # Send all buffered logs
+                for log_data in log_buffer:
+                    requests.post(SERVER_URL, json=log_data, headers={"X-API-Key": API_KEY}, timeout=3)
+                print(f"[Logger] Sent {len(log_buffer)} buffered logs")
+                log_buffer.clear()
+                last_send_time = now
+            except Exception as e:
+                print(f"[Logger Warning] Could not send buffered logs: {e}")
 
     def get_recent_events(self, limit=50, incidents=False):
         """Fetch last N decrypted events (normal by default)."""

@@ -34,6 +34,13 @@ export interface NodeStatus {
   online: boolean;
 }
 
+export interface NodeSettings {
+  node_id: string;
+  name: string;
+  enable_log_collection: boolean;
+  log_send_interval: number;
+}
+
 export class SiemApiError extends Error {
   constructor(message: string, public status?: number) {
     super(message);
@@ -94,6 +101,17 @@ export const siemApi = {
 
   async getNodes(): Promise<NodeStatus[]> {
     return apiRequest<NodeStatus[]>('/api/nodes');
+  },
+
+  async getNodeSettings(nodeId: string): Promise<NodeSettings> {
+    return apiRequest<NodeSettings>(`/api/nodes/${nodeId}/settings`);
+  },
+
+  async updateNodeSettings(nodeId: string, settings: NodeSettings): Promise<{ status: string }> {
+    return apiRequest<{ status: string }>(`/api/nodes/${nodeId}/settings`, {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    });
   },
 
   getExportUrl(params: { node_id?: string; event_type?: string; q?: string; start?: string; end?: string } = {}) {

@@ -26,6 +26,17 @@ class DatabaseManager:
                 )
             """)
 
+            # Create nodes table for settings
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS nodes (
+                    node_id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    enable_log_collection BOOLEAN NOT NULL DEFAULT 1,
+                    log_send_interval INTEGER NOT NULL DEFAULT 30,
+                    updated_at TEXT NOT NULL
+                )
+            """)
+
             # Create indexes for performance
             cur.execute("CREATE INDEX IF NOT EXISTS idx_node_id ON logs(node_id)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_created_at ON logs(created_at)")
