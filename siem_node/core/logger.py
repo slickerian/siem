@@ -49,21 +49,46 @@ class EncryptedLogger:
         """Fetch settings from server periodically"""
         global settings_cache
         now = time.time()
-        if now - settings_cache['last_fetched'] < 10:  # Fetch every 60 seconds
+        if now - settings_cache['last_fetched'] < 30:  # Fetch every 30 seconds
             return
 
         try:
             response = requests.get(SETTINGS_URL.format(NODE_ID), timeout=5)
             if response.status_code == 200:
                 data = response.json()
+                old_enable = settings_cache['enable_log_collection']
                 settings_cache.update({
                     'enable_log_collection': data.get('enable_log_collection', True),
                     'log_send_interval': data.get('log_send_interval', 30),
                     'last_fetched': now
                 })
-                print(f"[Logger] Settings updated: {settings_cache}")
+                if old_enable != settings_cache['enable_log_collection']:
+                    print(f"[Logger] Log collection {'enabled' if settings_cache['enable_log_collection'] else 'disabled'}")
+                    if not settings_cache['enable_log_collection']:
+                        # Clear buffer when disabled
+                        log_buffer.clear()
+                        print("[Logger] Cleared log buffer")
+                print(f"[Logger] Settings updated: enable={settings_cache['enable_log_collection']}, interval={settings_cache['log_send_interval']}")
+            else:
+                print(f"[Logger] Settings fetch failed: HTTP {response.status_code}")
         except Exception as e:
             print(f"[Logger] Could not fetch settings: {e}")
+
+    def send_heartbeat(self):
+        """Send a heartbeat log to keep node online"""
+        try:
+            requests.post(
+                SERVER_URL,
+                json={
+                    "node_id": NODE_ID,
+                    "event_type": "HEARTBEAT",
+                    "data": "Node is alive",
+                },
+                headers={"X-API-Key": API_KEY},
+                timeout=3
+            )
+        except Exception as e:
+            print(f"[Logger] Heartbeat failed: {e}")
 
     def log(self, event_type, data):
         """Normal encrypted log entry + send to server."""

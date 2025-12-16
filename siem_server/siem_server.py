@@ -329,7 +329,7 @@ def get_nodes():
     for r in rows:
         nid = r["node_id"]
         last_seen = node_status.get(nid)
-        online = last_seen and (now - last_seen).total_seconds() < 10  # online if seen in last 10s
+        online = last_seen and (now - last_seen).total_seconds() < 30  # online if seen in last 30s
         nodes.append({"node_id": nid, "online": bool(online)})
 
     logger.debug(f"Returning {len(nodes)} nodes")

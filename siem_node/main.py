@@ -33,6 +33,9 @@ def main():
 
     print("[*] SIEM CLI Agent Starting...")
 
+    # Fetch initial settings
+    logger.fetch_settings()
+
     # Start monitors
     start_monitor(usb_monitor, "USB", logger)
     start_monitor(file_watcher, "File", logger)
@@ -42,6 +45,7 @@ def main():
 
     try:
         logger.log("MONITORING_STARTED", {})
+        heartbeat_counter = 0
 
         while True:
             # Shutdown mechanism
@@ -51,6 +55,12 @@ def main():
                 print("[✓] Shutdown flag detected. Stopping service...")
                 subprocess.run(["systemctl", "stop", SERVICE_NAME])
                 break
+
+            # Fetch settings periodically
+            logger.fetch_settings()
+
+            # Send heartbeat every 5 seconds to keep node online
+            logger.send_heartbeat()
 
             # Collect events + evaluate policies
             events = logger.get_recent_events()
