@@ -13,8 +13,8 @@ INCIDENT_LOG_FILE = os.path.join(LOG_DIR, "incidents.enc")
 KEY_FILE = os.path.join(LOG_DIR, "logging_key.bin")
 
 # ✅ Server endpoint and API key
-SERVER_URL = "http://192.168.1.6:8000/log"
-SETTINGS_URL = "http://192.168.1.6:8000/api/nodes/{}/settings"
+SERVER_URL = "http://100.117.9.73:8000/log"
+SETTINGS_URL = "http://100.117.9.73:8000/api/nodes/{}/settings"
 API_KEY = "secretkey"  # must match server config
 
 # Each node identifies itself
@@ -49,7 +49,7 @@ class EncryptedLogger:
         """Fetch settings from server periodically"""
         global settings_cache
         now = time.time()
-        if now - settings_cache['last_fetched'] < 60:  # Fetch every 60 seconds
+        if now - settings_cache['last_fetched'] < 10:  # Fetch every 60 seconds
             return
 
         try:
