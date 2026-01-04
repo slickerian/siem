@@ -50,7 +50,7 @@ class EncryptedLogger:
         """Fetch settings from server periodically"""
         global settings_cache
         now = time.time()
-        if now - settings_cache['last_fetched'] < 30:  # Fetch every 30 seconds
+        if now - settings_cache['last_fetched'] < 10:  # Fetch every 30 seconds
             return
 
         try:
