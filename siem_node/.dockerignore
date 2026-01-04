@@ -1,0 +1,7 @@
+installer/
+servicefiles/
+.gitignore
+README.md
+view_logs.py
+__pycache__/
+*.pyc

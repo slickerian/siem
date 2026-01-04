@@ -4,7 +4,8 @@ import os
 import time
 import subprocess
 
-MAIN_PID_FILE = "/tmp/siem_main.pid"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MAIN_PID_FILE = "/tmp/insider_main.pid"
 B_PID_FILE = "/tmp/watchdog_b.pid"
 
 def get_pid_from_file(pid_file):
@@ -19,7 +20,8 @@ def is_alive(pid):
 
 def restart_process(script_name):
     print(f"[!] Restarting {script_name}")
-    subprocess.Popen(["/usr/bin/python3", f"/home/mechanic/siem/{script_name}"])
+    script_path = os.path.join(BASE_DIR, script_name)
+    subprocess.Popen(["python3", script_path])
 
 def main():
     with open("/tmp/watchdog_a.pid", "w") as f:

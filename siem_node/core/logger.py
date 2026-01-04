@@ -12,10 +12,11 @@ LOG_FILE = os.path.join(LOG_DIR, "siem_logs.enc")
 INCIDENT_LOG_FILE = os.path.join(LOG_DIR, "incidents.enc")
 KEY_FILE = os.path.join(LOG_DIR, "logging_key.bin")
 
-# ✅ Server endpoint and API key
-SERVER_URL = "http://10.144.121.140:8000/log"
-SETTINGS_URL = "http://10.144.121.140:8000/api/nodes/{}/settings"
-API_KEY = "secretkey"  # must match server config
+# ✅ Server endpoint and API key (configurable via env vars)
+import os
+SERVER_URL = os.getenv("SIEM_SERVER_URL", "http://10.144.121.140:8000/log")
+SETTINGS_URL = os.getenv("SIEM_SETTINGS_URL", "http://10.144.121.140:8000/api/nodes/{}/settings")
+API_KEY = os.getenv("SIEM_API_KEY", "secretkey")  # must match server config
 
 # Each node identifies itself
 NODE_ID = os.uname().nodename  # or any unique string per node

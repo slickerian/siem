@@ -53,7 +53,7 @@ def main():
                 os.remove(SHUTDOWN_FLAG)
                 logger.log("SYSTEM_SHUTDOWN", {"reason": "Authorized via shutdown flag"})
                 print("[✓] Shutdown flag detected. Stopping service...")
-                subprocess.run(["systemctl", "stop", SERVICE_NAME])
+                # In container, just break the loop; systemd not available
                 break
 
             # Fetch settings periodically
