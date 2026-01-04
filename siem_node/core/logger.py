@@ -13,8 +13,8 @@ INCIDENT_LOG_FILE = os.path.join(LOG_DIR, "incidents.enc")
 KEY_FILE = os.path.join(LOG_DIR, "logging_key.bin")
 
 # ✅ Server endpoint and API key
-SERVER_URL = "http://100.117.9.73:8000/log"
-SETTINGS_URL = "http://100.117.9.73:8000/api/nodes/{}/settings"
+SERVER_URL = "http://10.144.121.140:8000/log"
+SETTINGS_URL = "http://10.144.121.140:8000/api/nodes/{}/settings"
 API_KEY = "secretkey"  # must match server config
 
 # Each node identifies itself
