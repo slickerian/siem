@@ -11,6 +11,8 @@ import { Download } from "lucide-react";
 
 import { siemApi, StatsResponse, LogsResponse, LogEntry } from "@/services/siemApi";
 
+const isCritical = (eventType: string) => ['ERROR','CRITICAL','FAIL','ACTION_FAILED'].includes(eventType.toUpperCase().trim());
+
 const Dashboard = () => {
   // ---------------- States ----------------
   const [nodes, setNodes] = useState<{ node_id: string; online: boolean }[]>([]);
@@ -166,13 +168,13 @@ const Dashboard = () => {
         return newLogs.slice(0, 1000);
       });
 
-      // Update live stats from WebSocket data
-      setLiveStats({
-        total: log.total,
-        critical: log.critical,
-        last24h: log.last24h,
-        avgPerHour: log.avgPerHour,
-      });
+      // Update live stats incrementally to keep per-node totals accurate
+      setLiveStats(prev => ({
+        total: prev.total + 1,
+        critical: prev.critical + (isCritical(log.event_type) ? 1 : 0),
+        last24h: prev.last24h,
+        avgPerHour: prev.avgPerHour,
+      }));
 
       // Refresh chart data to show live updates
       refreshCharts();
