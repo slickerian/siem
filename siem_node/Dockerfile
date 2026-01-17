@@ -16,7 +16,10 @@ COPY . .
 # Ensure logs directory exists
 RUN mkdir -p logs
 
+# Make startup script executable
+RUN chmod +x startup.sh
+
 # Expose any ports if needed (none for siem_node)
 
 # Set entrypoint
-CMD ["python", "main.py"]
+CMD ["./startup.sh"]
