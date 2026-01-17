@@ -5,3 +5,5 @@ inotify-simple
 pycryptodome
 pyyaml
 python-socketio
+scapy
+dnspython

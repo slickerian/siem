@@ -168,35 +168,39 @@ const Dashboard = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold">{globalStats.totalNodes}</div>
-              <div className="text-sm text-muted-foreground">Total Nodes</div>
+          <div className="flex items-center justify-between">
+            <div className="flex gap-4">
+              <div className="text-center">
+                <div className="text-lg font-bold">{globalStats.totalNodes}</div>
+                <div className="text-xs text-muted-foreground">Total</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-bold text-green-600">{globalStats.onlineNodes}</div>
+                <div className="text-xs text-muted-foreground">Online</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-bold text-red-600">{globalStats.totalNodes - globalStats.onlineNodes}</div>
+                <div className="text-xs text-muted-foreground">Offline</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-bold text-orange-600">{globalStats.criticalEvents}</div>
+                <div className="text-xs text-muted-foreground">Alerts</div>
+              </div>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">{globalStats.onlineNodes}</div>
-              <div className="text-sm text-muted-foreground">Online</div>
+            <div className="w-48 h-12 overflow-hidden border rounded-md">
+              <div className="flex gap-2 p-2 overflow-x-auto scrollbar-hide">
+                {nodes.map((node) => (
+                  <span
+                    key={node.node_id}
+                    className={`px-2 py-1 rounded text-xs whitespace-nowrap ${
+                      node.online ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}
+                  >
+                    {node.node_id}
+                  </span>
+                ))}
+              </div>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-red-600">{globalStats.totalNodes - globalStats.onlineNodes}</div>
-              <div className="text-sm text-muted-foreground">Offline</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-orange-600">{globalStats.criticalEvents}</div>
-              <div className="text-sm text-muted-foreground">Critical Alerts</div>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {nodes.map((node) => (
-              <span
-                key={node.node_id}
-                className={`px-3 py-1 rounded-full text-sm ${
-                  node.online ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                }`}
-              >
-                {node.node_id}
-              </span>
-            ))}
           </div>
         </CardContent>
       </Card>

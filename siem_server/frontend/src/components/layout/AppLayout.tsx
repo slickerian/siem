@@ -7,7 +7,7 @@ import {
   AlertTriangle,
   Settings,
 } from "lucide-react"
-import { Sidebar, SidebarContent } from "@/components/ui/sidebar"
+
 import { cn } from "@/lib/utils"
 
 const navigation = [
@@ -18,43 +18,41 @@ const navigation = [
   { name: "Settings", href: "/settings", icon: Settings },
 ]
 
-function TopNavigation() {
+function SideNavigation() {
   const location = useLocation()
 
   return (
-    <Sidebar>
-      <SidebarContent>
-        {navigation.map((item) => {
-          const active = location.pathname === item.href
-          return (
-            <Link
-              key={item.name}
-              to={item.href}
-              className={cn(
-                "flex items-center gap-2 px-3 py-1.5 rounded-md transition-colors",
-                active
-                  ? "bg-accent text-accent-foreground"
-                  : "hover:bg-accent/60"
-              )}
-            >
-              <item.icon className="h-4 w-4" />
-              <span className="hidden sm:inline">{item.name}</span>
-            </Link>
-          )
-        })}
-      </SidebarContent>
-    </Sidebar>
+    <div className="absolute left-0 top-0 h-full w-16 bg-background border-r border-border flex flex-col items-center py-4 space-y-4 z-50">
+      {navigation.map((item) => {
+        const active = location.pathname === item.href
+        return (
+          <Link
+            key={item.name}
+            to={item.href}
+            className={cn(
+              "flex items-center justify-center p-3 rounded-md transition-colors",
+              active
+                ? "bg-accent text-accent-foreground"
+                : "hover:bg-accent/60"
+            )}
+            title={item.name}
+          >
+            <item.icon className="h-5 w-5" />
+          </Link>
+        )
+      })}
+    </div>
   )
 }
 
 export default function AppLayout() {
   return (
-    <div className="min-h-screen bg-background">
-      {/* Floating top nav */}
-      <TopNavigation />
+    <div className="min-h-screen bg-background flex">
+      {/* Floating left sidebar */}
+      <SideNavigation />
 
-      {/* Page content scrolls underneath */}
-      <main className="px-6 py-6">
+      {/* Page content with left margin for sidebar */}
+      <main className="flex-1 ml-16 px-6 py-6">
         <Outlet />
       </main>
     </div>

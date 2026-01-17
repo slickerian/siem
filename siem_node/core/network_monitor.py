@@ -4,6 +4,8 @@ import psutil
 import yaml
 import os
 
+from .network_discovery import perform_network_discovery
+
 
 CONFIG_RULES = os.path.join(os.path.dirname(__file__), "..", "config", "rules.yml")
 
@@ -75,3 +77,11 @@ def start(logger, interval=2):
 
     thread = threading.Thread(target=monitor_loop, daemon=True)
     thread.start()
+
+    def discovery_loop():
+        while True:
+            perform_network_discovery(logger)
+            time.sleep(300)
+
+    discovery_thread = threading.Thread(target=discovery_loop, daemon=True)
+    discovery_thread.start()

@@ -5,6 +5,7 @@ import { toast } from "@/hooks/use-toast";
 import { StatsCards } from "@/components/siem/StatsCards";
 import { EventChart } from "@/components/siem/EventChart";
 import { EventTypeChart } from "@/components/siem/EventTypeChart";
+import NetworkTopology from "@/components/siem/NetworkTopology";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -206,6 +207,9 @@ const Analytics = () => {
             <EventChart data={chartData} />
             <EventTypeChart data={stats.histogram || []} />
           </div>
+
+          {/* Network Topology */}
+          <NetworkTopology selectedNode={selectedNode} />
 
           {/* Additional Analytics */}
           <div className="space-y-4">
