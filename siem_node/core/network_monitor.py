@@ -50,6 +50,10 @@ def diff_connections(prev, curr, whitelist_ips, whitelist_ports, logger):
         print(f"[NET] New connection {laddr} -> {raddr} (PID {pid})")
 
     for laddr, raddr, pid, status in closed_conns:
+        if raddr:
+            ip, port = raddr.split(":")
+            if ip in whitelist_ips or port in whitelist_ports:
+                continue
         logger.log("NET_DISCONNECT", {
             "local": laddr, "remote": raddr, "pid": pid, "status": status, "timestamp": time.time()
         })
