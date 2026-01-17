@@ -6,6 +6,9 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import AppLayout from "./components/layout/AppLayout";
 import Dashboard from "./pages/Dashboard";
+import Analytics from "./pages/Analytics";
+import Events from "./pages/Events";
+import Alerts from "./pages/Alerts";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -21,8 +24,10 @@ const App = () => (
           <Routes>
             <Route path="/" element={<AppLayout />}>
               <Route index element={<Dashboard />} />
+              <Route path="analytics" element={<Analytics />} />
+              <Route path="events" element={<Events />} />
+              <Route path="alerts" element={<Alerts />} />
               <Route path="settings" element={<Settings />} />
-              {/* Future routes will go here */}
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

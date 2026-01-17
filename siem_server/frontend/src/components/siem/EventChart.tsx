@@ -21,6 +21,24 @@ interface EventChartProps {
 }
 
 export function EventChart({ data }: EventChartProps) {
+  if (!data || data.length === 0) {
+    return (
+      <Card className="siem-card border-border">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-foreground">
+            <TrendingUp className="h-5 w-5 text-primary" />
+            Event Timeline
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-sm text-muted-foreground p-4 text-center">
+            No event timeline data available.
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const MIN_VISIBLE = 10; // never show fewer than this many points
   const chartRef = useRef<HTMLDivElement | null>(null);
 
