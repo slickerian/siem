@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Network } from 'vis-network/standalone';
-import { siemApi } from '@/services/siemApi';
+import { LogEntry, siemApi } from '@/services/siemApi';
 import { toast } from '@/hooks/use-toast';
 
 interface Device {
@@ -53,7 +53,7 @@ const NetworkTopology: React.FC<NetworkTopologyProps> = ({ selectedNode }) => {
         const devices: { [ip: string]: Device } = {};
         const edges: Edge[] = [];
 
-        allLogs.forEach((log: any) => {
+        allLogs.forEach((log: LogEntry) => {
           if (log.event_type === 'DEVICE_DISCOVERED') {
             // Parse data like "IP: 192.168.1.1, MAC: aa:bb:cc:dd:ee:ff, Hostname: device1"
             const match = log.data.match(/IP:\s*([^,]+),\s*MAC:\s*([^,]+),\s*Hostname:\s*(.*)/);
@@ -64,8 +64,8 @@ const NetworkTopology: React.FC<NetworkTopologyProps> = ({ selectedNode }) => {
               devices[ip] = { ip, mac, hostname };
             }
           } else if (log.event_type === 'COMMUNICATION_PATTERN') {
-            // Parse data like "Devices 192.168.1.1 and 192.168.1.2 have 5 active connections"
-            const match = log.data.match(/Devices\s+([^ ]+)\s+and\s+([^ ]+)\s+have\s+(\d+)\s+active connections/);
+            // Parse data like "Devices 192.168.1.1 and 192.168.1.2 have 5 local connections"
+            const match = log.data.match(/Devices\s+([^ ]+)\s+and\s+([^ ]+)\s+have\s+(\d+)\s+local connections/);
             if (match) {
               const from = match[1];
               const to = match[2];
@@ -119,6 +119,7 @@ const NetworkTopology: React.FC<NetworkTopologyProps> = ({ selectedNode }) => {
         smooth: {
           enabled: true,
           type: 'continuous',
+          roundness: 0.5,
         },
       },
       interaction: {

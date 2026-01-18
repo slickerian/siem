@@ -1,96 +1,158 @@
 # siem_node/core/network_discovery.py
+
 import socket
 import psutil
+import ipaddress
 from dns import resolver
-from scapy.all import ARP, Ether, srp, conf
+from scapy.all import ARP, Ether, srp
+
+
+# -----------------------------
+# Hostname Resolution
+# -----------------------------
 
 def resolve_hostname(ip):
-    """Resolve hostname for an IP using socket or DNS resolver."""
     try:
-        hostname = socket.gethostbyaddr(ip)[0]
-        return hostname
-    except socket.herror:
+        return socket.gethostbyaddr(ip)[0]
+    except Exception:
         try:
-            # Reverse DNS lookup
-            query = resolver.query(ip, 'PTR')
-            hostname = query[0].to_text()[:-1]  # Remove trailing dot
-            return hostname
+            query = resolver.resolve_address(ip)
+            return query[0].to_text().rstrip(".")
         except Exception:
             return None
 
-def detect_communication_patterns(devices, logger):
-    """Detect basic communication patterns using psutil."""
-    try:
-        connections = psutil.net_connections()
-        edges = {}
-        for conn in connections:
-            if conn.raddr and conn.laddr:
-                local_ip = conn.laddr.ip
-                remote_ip = conn.raddr.ip
-                # Only consider connections within discovered devices
-                if local_ip in devices and remote_ip in devices:
-                    pair = tuple(sorted([local_ip, remote_ip]))
-                    edges[pair] = edges.get(pair, 0) + 1
-        return edges
-    except Exception as e:
-        logger.log("NETWORK_DISCOVERY_ERROR", f"Failed to detect communication patterns: {e}")
-        return {}
 
-def get_local_subnet():
-    """Get the local subnet in CIDR notation, assuming /24."""
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        local_ip = s.getsockname()[0]
-        s.close()
-        # Assume /24 subnet
-        subnet_base = '.'.join(local_ip.split('.')[:-1]) + '.0/24'
-        return subnet_base
-    except Exception as e:
-        logger.log("NETWORK_DISCOVERY_ERROR", f"Failed to get local subnet: {e}")
-        return None
+# -----------------------------
+# Network Interface Discovery
+# -----------------------------
 
-def discover_devices(logger):
-    """Perform ARP scan on local subnet to discover devices and their communication patterns."""
-    subnet = get_local_subnet()
-    if not subnet:
-        return {'nodes': {}, 'edges': {}}
+def get_local_networks():
+    """
+    Discover all IPv4 networks on this host based on interfaces.
+    Returns a list of ipaddress.IPv4Network
+    """
+    networks = []
 
-    arp_request = ARP(pdst=subnet)
-    broadcast = Ether(dst="ff:ff:ff:ff:ff:ff")
-    packet = broadcast / arp_request
+    for iface, addrs in psutil.net_if_addrs().items():
+        for addr in addrs:
+            if addr.family == socket.AF_INET and addr.netmask:
+                try:
+                    network = ipaddress.IPv4Network(
+                        f"{addr.address}/{addr.netmask}",
+                        strict=False
+                    )
+                    networks.append(network)
+                except Exception:
+                    continue
 
-    try:
-        answered, unanswered = srp(packet, timeout=2, verbose=0)
-    except Exception as e:
-        logger.log("NETWORK_DISCOVERY_ERROR", f"ARP scan failed: {e}")
-        return {'nodes': {}, 'edges': {}}
+    return list(set(networks))
 
+
+# -----------------------------
+# ARP Discovery
+# -----------------------------
+
+def arp_scan(network, logger):
+    """
+    Perform ARP scan on a given IPv4Network
+    """
     devices = {}
-    for sent, received in answered:
+
+    packet = Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=str(network))
+
+    try:
+        answered, _ = srp(packet, timeout=2, verbose=0)
+    except Exception as e:
+        logger.log("NETWORK_DISCOVERY_ERROR", f"ARP scan failed on {network}: {e}")
+        return devices
+
+    for _, received in answered:
         ip = received.psrc
         mac = received.hwsrc
-        hostname = resolve_hostname(ip)
 
         devices[ip] = {
-            'mac': mac,
-            'hostname': hostname
+            "mac": mac,
+            "hostname": resolve_hostname(ip)
         }
 
-        # Log the discovery
-        logger.log("DEVICE_DISCOVERED", f"IP: {ip}, MAC: {mac}, Hostname: {hostname}")
+    return devices
 
-    # Detect communication patterns
-    edges = detect_communication_patterns(devices, logger)
 
-    # Log patterns
+# -----------------------------
+# Communication Pattern Detection
+# -----------------------------
+
+def detect_communication_patterns(devices, logger):
+    """
+    Detect communication *involving this host*.
+    Edges represent observed local participation, not full network traffic.
+    """
+    edges = {}
+
+    try:
+        connections = psutil.net_connections(kind="inet")
+    except Exception as e:
+        logger.log("NETWORK_DISCOVERY_ERROR", f"psutil failure: {e}")
+        return edges
+
+    for conn in connections:
+        if not conn.laddr or not conn.raddr:
+            continue
+
+        local_ip = conn.laddr.ip
+        remote_ip = conn.raddr.ip
+
+        if local_ip in devices and remote_ip in devices:
+            pair = tuple(sorted((local_ip, remote_ip)))
+            edges[pair] = edges.get(pair, 0) + 1
+
+    return edges
+
+
+# -----------------------------
+# Main Discovery Logic
+# -----------------------------
+
+def discover_devices(logger):
+    """
+    Discover network devices and basic communication edges.
+    Output format intentionally unchanged for frontend compatibility.
+    """
+    all_devices = {}
+    all_edges = {}
+
+    networks = get_local_networks()
+
+    for network in networks:
+        discovered = arp_scan(network, logger)
+
+        for ip, meta in discovered.items():
+            if ip not in all_devices:
+                all_devices[ip] = meta
+                logger.log(
+                    "DEVICE_DISCOVERED",
+                    f"IP: {ip}, MAC: {meta['mac']}, Hostname: {meta['hostname']}"
+                )
+
+    # Communication patterns (local host perspective)
+    edges = detect_communication_patterns(all_devices, logger)
+
     for pair, count in edges.items():
-        logger.log("COMMUNICATION_PATTERN", f"Devices {pair[0]} and {pair[1]} have {count} active connections")
+        logger.log(
+            "COMMUNICATION_PATTERN",
+            f"Devices {pair[0]} and {pair[1]} have {count} local connections"
+        )
+        all_edges[pair] = count
 
-    # Return graph structure
-    return {'nodes': devices, 'edges': edges}
+    return {
+        "nodes": all_devices,
+        "edges": all_edges
+    }
 
-# Function to be called periodically
+
+# -----------------------------
+# Periodic Entry Point
+# -----------------------------
+
 def perform_network_discovery(logger):
-    """Entry point for periodic network discovery."""
     return discover_devices(logger)
