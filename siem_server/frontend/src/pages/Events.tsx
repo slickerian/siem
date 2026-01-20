@@ -14,17 +14,38 @@ import { siemApi, LogsResponse, LogEntry } from "@/services/siemApi";
 const Events = () => {
   // ---------------- States ----------------
   const [nodes, setNodes] = useState<{ node_id: string; online: boolean }[]>([]);
-  const [selectedNode, setSelectedNode] = useState<string>("");
+  const [selectedNode, setSelectedNode] = useState<string>(localStorage.getItem('events_selectedNode') || "");
 
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(localStorage.getItem('events_searchQuery') || "");
 
   // Filters
-  const [startDate, setStartDate] = useState<string>(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]); // 7 days ago
-  const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]); // today
-  const [selectedEventType, setSelectedEventType] = useState<string>("all");
+  const [startDate, setStartDate] = useState<string>(localStorage.getItem('events_startDate') || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]); // 7 days ago
+  const [endDate, setEndDate] = useState<string>(localStorage.getItem('events_endDate') || new Date().toISOString().split('T')[0]); // today
+  const [selectedEventType, setSelectedEventType] = useState<string>(localStorage.getItem('events_selectedEventType') || "all");
+
+  // Persist filters
+  useEffect(() => {
+    localStorage.setItem('events_selectedNode', selectedNode);
+  }, [selectedNode]);
+
+  useEffect(() => {
+    localStorage.setItem('events_searchQuery', searchQuery);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    localStorage.setItem('events_startDate', startDate);
+  }, [startDate]);
+
+  useEffect(() => {
+    localStorage.setItem('events_endDate', endDate);
+  }, [endDate]);
+
+  useEffect(() => {
+    localStorage.setItem('events_selectedEventType', selectedEventType);
+  }, [selectedEventType]);
 
   // ---------------- Load Nodes ----------------
   const loadNodes = useCallback(async () => {
@@ -78,6 +99,50 @@ const Events = () => {
   useEffect(() => {
     loadLogs();
   }, [loadLogs]);
+
+  // Auto-refresh nodes every 10 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadNodes();
+    }, 10000); // 10 seconds
+
+    return () => clearInterval(interval);
+  }, [loadNodes]);
+
+  // WebSocket for live log updates
+  useEffect(() => {
+    console.log(`[WS] Connecting WebSocket for live events`);
+    const ws = siemApi.connectWebSocket((log) => {
+      console.log(`[WS] Received log from ${log.node_id}: ${log.event_type}`);
+
+      // Check if log matches current filters
+      const matchesNode = log.node_id === selectedNode;
+      const matchesEventType = selectedEventType === "all" || log.event_type === selectedEventType;
+      const matchesSearch = !searchQuery || log.data.toLowerCase().includes(searchQuery.toLowerCase());
+
+      // Date filtering consistent with API
+      const startIso = startDate ? new Date(startDate + 'T00:00:00').toISOString() : null;
+      const endIso = endDate ? new Date(endDate + 'T23:59:59').toISOString() : null;
+      const matchesDate = (!startIso || log.created_at >= startIso) && (!endIso || log.created_at <= endIso);
+
+      if (matchesNode && matchesEventType && matchesDate && matchesSearch) {
+        setLogs(prev => [log, ...prev].slice(0, 1000)); // Add to top, keep up to 1000
+      }
+    });
+
+    ws.onerror = (error) => {
+      console.error(`[WS] WebSocket error:`, error);
+    };
+
+    ws.onclose = (event) => {
+      console.log(`[WS] WebSocket closed:`, event.code, event.reason);
+    };
+
+    return () => {
+      console.log(`[WS] Closing WebSocket connection`);
+      ws.close();
+    };
+  }, [selectedNode, searchQuery, startDate, endDate, selectedEventType]);
 
   // ---------------- Handlers ----------------
   const handleNodeChange = (nodeId: string) => {

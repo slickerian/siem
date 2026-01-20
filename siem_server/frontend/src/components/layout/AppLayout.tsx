@@ -22,7 +22,7 @@ function SideNavigation() {
   const location = useLocation()
 
   return (
-    <div className="absolute left-0 top-0 h-full w-16 bg-background border-r border-border flex flex-col items-center py-4 space-y-4 z-50">
+    <div className="fixed left-0 top-0 h-full w-16 bg-background border-r border-border flex flex-col items-center py-4 space-y-4 z-50">
       {navigation.map((item) => {
         const active = location.pathname === item.href
         return (

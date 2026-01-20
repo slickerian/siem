@@ -16,16 +16,33 @@ const isCritical = (eventType: string) => ['ERROR','CRITICAL','FAIL','ACTION_FAI
 const Alerts = () => {
   // ---------------- States ----------------
   const [nodes, setNodes] = useState<{ node_id: string; online: boolean }[]>([]);
-  const [selectedNode, setSelectedNode] = useState<string>("");
+  const [selectedNode, setSelectedNode] = useState<string>(localStorage.getItem('alerts_selectedNode') || "");
 
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(localStorage.getItem('alerts_searchQuery') || "");
 
   // Filters
-  const [startDate, setStartDate] = useState<string>(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]); // 7 days ago
-  const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]); // today
+  const [startDate, setStartDate] = useState<string>(localStorage.getItem('alerts_startDate') || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]); // 7 days ago
+  const [endDate, setEndDate] = useState<string>(localStorage.getItem('alerts_endDate') || new Date().toISOString().split('T')[0]); // today
+
+  // Persist filters
+  useEffect(() => {
+    localStorage.setItem('alerts_selectedNode', selectedNode);
+  }, [selectedNode]);
+
+  useEffect(() => {
+    localStorage.setItem('alerts_searchQuery', searchQuery);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    localStorage.setItem('alerts_startDate', startDate);
+  }, [startDate]);
+
+  useEffect(() => {
+    localStorage.setItem('alerts_endDate', endDate);
+  }, [endDate]);
 
   // ---------------- Load Nodes ----------------
   const loadNodes = useCallback(async () => {
@@ -80,6 +97,48 @@ const Alerts = () => {
   useEffect(() => {
     loadAlerts();
   }, [loadAlerts]);
+
+  // Auto-refresh nodes every 10 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadNodes();
+    }, 10000); // 10 seconds
+
+    return () => clearInterval(interval);
+  }, [loadNodes]);
+
+  // WebSocket for live updates
+  useEffect(() => {
+    console.log(`[WS] Connecting WebSocket for live alerts`);
+    const ws = siemApi.connectWebSocket((log) => {
+      console.log(`[WS] Received log from ${log.node_id}: ${log.event_type}`);
+
+      // Check if log is critical and matches current filters
+      const isCriticalLog = isCritical(log.event_type);
+      const matchesNode = log.node_id === selectedNode;
+      // Date filtering consistent with API
+      const startIso = startDate ? new Date(startDate + 'T00:00:00').toISOString() : null;
+      const endIso = endDate ? new Date(endDate + 'T23:59:59').toISOString() : null;
+      const matchesDate = (!startIso || log.created_at >= startIso) && (!endIso || log.created_at <= endIso);
+
+      if (isCriticalLog && matchesNode && matchesDate) {
+        setLogs(prev => [log, ...prev].slice(0, 1000)); // Add to top, keep up to 1000
+      }
+    });
+
+    ws.onerror = (error) => {
+      console.error(`[WS] WebSocket error:`, error);
+    };
+
+    ws.onclose = (event) => {
+      console.log(`[WS] WebSocket closed:`, event.code, event.reason);
+    };
+
+    return () => {
+      console.log(`[WS] Closing WebSocket connection`);
+      ws.close();
+    };
+  }, [selectedNode, startDate, endDate, loadAlerts]);
 
   // ---------------- Handlers ----------------
   const handleNodeChange = (nodeId: string) => {

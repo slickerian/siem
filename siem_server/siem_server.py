@@ -383,6 +383,22 @@ def update_node_settings(node_id: str, settings: NodeSettings):
     return {"status": "ok"}
 
 # -----------------------------
+# /api/nodes/{node_id} - delete node
+# -----------------------------
+@app.delete("/api/nodes/{node_id}")
+def delete_node(node_id: str):
+    logger.info(f"Deleting node {node_id} and its logs")
+
+    # Delete node settings
+    db_manager.execute_query("DELETE FROM nodes WHERE node_id = ?", (node_id,), fetch=False)
+
+    # Delete all logs for this node
+    db_manager.execute_query("DELETE FROM logs WHERE node_id = ?", (node_id,), fetch=False)
+
+    logger.info(f"Node {node_id} and its logs deleted")
+    return {"status": "ok"}
+
+# -----------------------------
 # /api/logs - fetch logs (supports node_id)
 # -----------------------------
 @app.get("/api/logs")

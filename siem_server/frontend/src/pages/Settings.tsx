@@ -7,6 +7,7 @@ import { Switch } from "../components/ui/switch";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../components/ui/alert-dialog";
 
 interface NodeSettings {
   node_id: string;
@@ -20,6 +21,8 @@ const Settings = () => {
   const [selectedNode, setSelectedNode] = useState<string>("");
   const [settings, setSettings] = useState<NodeSettings | null>(null);
   const [loading, setLoading] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
 
   useEffect(() => {
     loadNodes();
@@ -69,6 +72,22 @@ const Settings = () => {
       console.error("Failed to save settings:", error);
       alert("Failed to save settings");
     }
+  };
+
+  const deleteNode = async () => {
+    if (!selectedNode) return;
+    try {
+      await siemApi.deleteNode(selectedNode);
+      alert("Node deleted successfully!");
+      setSelectedNode("");
+      setSettings(null);
+      loadNodes(); // Reload nodes list
+    } catch (error) {
+      console.error("Failed to delete node:", error);
+      alert("Failed to delete node");
+    }
+    setDeleteDialogOpen(false);
+    setConfirmText("");
   };
 
   const selectedNodeData = nodes.find(n => n.node_id === selectedNode);
@@ -143,9 +162,37 @@ const Settings = () => {
                   />
                 </div>
 
-                <Button onClick={saveSettings} disabled={loading}>
-                  {loading ? "Saving..." : "Save Settings"}
-                </Button>
+                <div className="flex space-x-2">
+                  <Button onClick={saveSettings} disabled={loading}>
+                    {loading ? "Saving..." : "Save Settings"}
+                  </Button>
+                  <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive">Delete Node</Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action will permanently delete node "{selectedNode}" and all its logs. This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <div className="py-4">
+                        <Label htmlFor="confirm-delete">Type the node name to confirm:</Label>
+                        <Input
+                          id="confirm-delete"
+                          value={confirmText}
+                          onChange={(e) => setConfirmText(e.target.value)}
+                          placeholder={selectedNode}
+                        />
+                      </div>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setConfirmText("")}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={deleteNode} disabled={confirmText !== selectedNode}>Delete</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               </div>
             )}
           </CardContent>

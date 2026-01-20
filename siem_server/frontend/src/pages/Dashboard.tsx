@@ -90,7 +90,7 @@ const Dashboard = () => {
     const interval = setInterval(() => {
       loadNodes();
       loadGlobalStats();
-    }, 30000); // 30 seconds
+    }, 10000); // 10 seconds
 
     return () => clearInterval(interval);
   }, [loadNodes, loadGlobalStats]);

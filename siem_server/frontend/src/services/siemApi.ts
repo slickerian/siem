@@ -114,6 +114,12 @@ export const siemApi = {
     });
   },
 
+  async deleteNode(nodeId: string): Promise<{ status: string }> {
+    return apiRequest<{ status: string }>(`/api/nodes/${nodeId}`, {
+      method: 'DELETE',
+    });
+  },
+
   getExportUrl(params: { node_id?: string; event_type?: string; q?: string; start?: string; end?: string } = {}) {
     const query = buildQuery(params);
     return `${API_BASE_URL}/export.csv${query ? `?${query}` : ''}`;

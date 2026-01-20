@@ -10,14 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, RefreshCw } from "lucide-react";
+import { Download } from "lucide-react";
 
 import { siemApi, StatsResponse } from "@/services/siemApi";
 
 const Analytics = () => {
   // States
   const [nodes, setNodes] = useState<{ node_id: string; online: boolean }[]>([]);
-  const [selectedNode, setSelectedNode] = useState<string>("");
+  const [selectedNode, setSelectedNode] = useState<string>(localStorage.getItem('analytics_selectedNode') || "");
 
   const [chartData, setChartData] = useState<{ bucket: string; count: number }[]>([]);
   const [stats, setStats] = useState<StatsResponse | null>(null);
@@ -25,9 +25,26 @@ const Analytics = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Filters
-  const [startDate, setStartDate] = useState<string>(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]); // 7 days ago
-  const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]); // today
-  const [bucketMinutes, setBucketMinutes] = useState<number>(60); // 1 hour buckets
+  const [startDate, setStartDate] = useState<string>(localStorage.getItem('analytics_startDate') || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]); // 7 days ago
+  const [endDate, setEndDate] = useState<string>(localStorage.getItem('analytics_endDate') || new Date().toISOString().split('T')[0]); // today
+  const [bucketMinutes, setBucketMinutes] = useState<number>(parseInt(localStorage.getItem('analytics_bucketMinutes') || '60')); // 1 hour buckets
+
+  // Persist filters
+  useEffect(() => {
+    localStorage.setItem('analytics_selectedNode', selectedNode);
+  }, [selectedNode]);
+
+  useEffect(() => {
+    localStorage.setItem('analytics_startDate', startDate);
+  }, [startDate]);
+
+  useEffect(() => {
+    localStorage.setItem('analytics_endDate', endDate);
+  }, [endDate]);
+
+  useEffect(() => {
+    localStorage.setItem('analytics_bucketMinutes', bucketMinutes.toString());
+  }, [bucketMinutes]);
 
   // Load Nodes
   const loadNodes = useCallback(async () => {
@@ -78,17 +95,49 @@ const Analytics = () => {
     loadAnalytics();
   }, [loadAnalytics]);
 
-  // Auto-refresh every 30 seconds
+  // Auto-refresh every 10 seconds
   useEffect(() => {
     if (!selectedNode) return;
 
     const interval = setInterval(() => {
       loadAnalytics();
       loadNodes();
-    }, 30000); // 30 seconds
+    }, 10000); // 10 seconds
 
     return () => clearInterval(interval);
   }, [selectedNode, loadAnalytics, loadNodes]);
+
+  // WebSocket for live updates
+  useEffect(() => {
+    console.log(`[WS] Connecting WebSocket for live analytics`);
+    const ws = siemApi.connectWebSocket((log) => {
+      console.log(`[WS] Received log from ${log.node_id}: ${log.event_type}`);
+
+      // Check if log matches current filters
+      const matchesNode = log.node_id === selectedNode;
+      // Date filtering consistent with API
+      const startIso = startDate ? new Date(startDate + 'T00:00:00').toISOString() : null;
+      const endIso = endDate ? new Date(endDate + 'T23:59:59').toISOString() : null;
+      const matchesDate = (!startIso || log.created_at >= startIso) && (!endIso || log.created_at <= endIso);
+
+      if (matchesNode && matchesDate) {
+        loadAnalytics(); // Refresh analytics data
+      }
+    });
+
+    ws.onerror = (error) => {
+      console.error(`[WS] WebSocket error:`, error);
+    };
+
+    ws.onclose = (event) => {
+      console.log(`[WS] WebSocket closed:`, event.code, event.reason);
+    };
+
+    return () => {
+      console.log(`[WS] Closing WebSocket connection`);
+      ws.close();
+    };
+  }, [selectedNode, startDate, endDate, loadAnalytics]);
 
   // Handlers
   const handleNodeChange = (nodeId: string) => {
@@ -190,14 +239,6 @@ const Analytics = () => {
             </SelectContent>
           </Select>
         </div>
-      </div>
-
-      {/* Refresh Button */}
-      <div className="flex justify-center">
-        <Button onClick={loadAnalytics} disabled={isLoading} className="flex items-center gap-2">
-          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-          {isLoading ? 'Loading...' : 'Refresh Analytics'}
-        </Button>
       </div>
 
       {/* Charts */}
