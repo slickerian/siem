@@ -30,7 +30,7 @@ jobs:
         with:
           owner-type: user         
           token: ${{ secrets.PAT_TOKEN }}
-          repository_owner: ${{ github.repository_owner }}
+          repository-owner: ${{ github.repository_owner }}
           repository-name: siem-node
           delete-untagged: true
           keep-at-most: 5
