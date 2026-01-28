@@ -120,6 +120,17 @@ export const siemApi = {
     });
   },
 
+  async getLogSeverities(): Promise<{ [key: string]: string }> {
+    return apiRequest<{ [key: string]: string }>('/api/log-severities');
+  },
+
+  async updateLogSeverities(severities: { critical: string; warning: string; info: string }): Promise<{ status: string }> {
+    return apiRequest<{ status: string }>('/api/log-severities', {
+      method: 'PUT',
+      body: JSON.stringify(severities),
+    });
+  },
+
   getExportUrl(params: { node_id?: string; event_type?: string; q?: string; start?: string; end?: string } = {}) {
     const query = buildQuery(params);
     return `${API_BASE_URL}/export.csv${query ? `?${query}` : ''}`;

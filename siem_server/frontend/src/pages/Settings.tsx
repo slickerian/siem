@@ -23,9 +23,11 @@ const Settings = () => {
   const [loading, setLoading] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
+  const [severities, setSeverities] = useState({ critical: "", warning: "", info: "" });
 
   useEffect(() => {
     loadNodes();
+    loadSeverities();
   }, []);
 
   useEffect(() => {
@@ -40,6 +42,19 @@ const Settings = () => {
       setNodes(nodeList);
     } catch (error) {
       console.error("Failed to load nodes:", error);
+    }
+  };
+
+  const loadSeverities = async () => {
+    try {
+      const sev = await siemApi.getLogSeverities();
+      setSeverities({
+        critical: sev.critical || "",
+        warning: sev.warning || "",
+        info: sev.info || "",
+      });
+    } catch (error) {
+      console.error("Failed to load severities:", error);
     }
   };
 
@@ -88,6 +103,16 @@ const Settings = () => {
     }
     setDeleteDialogOpen(false);
     setConfirmText("");
+  };
+
+  const saveSeverities = async () => {
+    try {
+      await siemApi.updateLogSeverities(severities);
+      alert("Log severities saved successfully!");
+    } catch (error) {
+      console.error("Failed to save severities:", error);
+      alert("Failed to save severities");
+    }
   };
 
   const selectedNodeData = nodes.find(n => n.node_id === selectedNode);
@@ -212,12 +237,49 @@ const Settings = () => {
           </p>
         </div>
 
-        <div className="bg-card p-6 rounded-lg border">
-          <h2 className="text-lg font-semibold mb-4">Security Settings</h2>
-          <p className="text-muted-foreground">
-            Manage security and access controls.
-          </p>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Security Settings</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="critical-events">Critical Event Types</Label>
+              <Input
+                id="critical-events"
+                value={severities.critical}
+                onChange={(e) => setSeverities(prev => ({ ...prev, critical: e.target.value }))}
+                placeholder="ERROR,CRITICAL,FAIL,ACTION_FAILED"
+              />
+              <p className="text-sm text-muted-foreground">Comma-separated list of event types that should be treated as critical (red alerts)</p>
+            </div>
+
+            <div>
+              <Label htmlFor="warning-events">Warning Event Types</Label>
+              <Input
+                id="warning-events"
+                value={severities.warning}
+                onChange={(e) => setSeverities(prev => ({ ...prev, warning: e.target.value }))}
+                placeholder="WARN,WARNING"
+              />
+              <p className="text-sm text-muted-foreground">Comma-separated list of event types that should be treated as warnings (yellow)</p>
+            </div>
+
+            <div>
+              <Label htmlFor="info-events">Info Event Types</Label>
+              <Input
+                id="info-events"
+                value={severities.info}
+                onChange={(e) => setSeverities(prev => ({ ...prev, info: e.target.value }))}
+                placeholder="INFO,AUTH,SUCCESS"
+              />
+              <p className="text-sm text-muted-foreground">Comma-separated list of event types that should be treated as info (blue)</p>
+            </div>
+
+            <Button onClick={saveSeverities}>
+              Save Log Severities
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

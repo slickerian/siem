@@ -67,6 +67,11 @@ class NodeSettings(BaseModel):
     enable_log_collection: bool
     log_send_interval: int
 
+class LogSeveritiesUpdate(BaseModel):
+    critical: str
+    warning: str
+    info: str
+
 # -----------------------------
 # Helpers
 # -----------------------------
@@ -94,10 +99,15 @@ def get_cached_stats() -> Dict[str, int]:
         row = cur.execute("SELECT COUNT(*) FROM logs").fetchone()
         total_logs = row[0] if row else 0
 
-        # Critical logs
-        row = cur.execute(
-            "SELECT COUNT(*) FROM logs WHERE UPPER(TRIM(event_type)) IN ('ERROR','CRITICAL','FAIL','ACTION_FAILED')"
-        ).fetchone()
+        # Critical logs - get configured critical types
+        critical_types_row = cur.execute("SELECT event_types FROM log_severities WHERE severity = 'critical'").fetchone()
+        critical_types = critical_types_row[0] if critical_types_row else "ERROR,CRITICAL,FAIL,ACTION_FAILED"
+        critical_list = [t.strip().upper() for t in critical_types.split(',') if t.strip()]
+        placeholders = ','.join('?' * len(critical_list))
+        if critical_list:
+            row = cur.execute(f"SELECT COUNT(*) FROM logs WHERE UPPER(TRIM(event_type)) IN ({placeholders})", critical_list).fetchone()
+        else:
+            row = cur.execute("SELECT COUNT(*) FROM logs WHERE 0").fetchone()  # No critical types
         critical_count = row[0] if row else 0
 
         # Last 24h logs - convert to IST for comparison since logs are stored in IST
@@ -396,6 +406,35 @@ def delete_node(node_id: str):
     db_manager.execute_query("DELETE FROM logs WHERE node_id = ?", (node_id,), fetch=False)
 
     logger.info(f"Node {node_id} and its logs deleted")
+    return {"status": "ok"}
+
+# -----------------------------
+# /api/log-severities - get log severities
+# -----------------------------
+@app.get("/api/log-severities")
+def get_log_severities():
+    logger.debug("Fetching log severities")
+    rows = db_manager.execute_query("SELECT severity, event_types FROM log_severities")
+    return {row["severity"]: row["event_types"] for row in rows}
+
+# -----------------------------
+# /api/log-severities - update log severities
+# -----------------------------
+class LogSeveritiesUpdate(BaseModel):
+    critical: str
+    warning: str
+    info: str
+
+@app.put("/api/log-severities")
+def update_log_severities(severities: LogSeveritiesUpdate):
+    logger.info("Updating log severities")
+
+    # Update each severity
+    db_manager.execute_query("UPDATE log_severities SET event_types = ? WHERE severity = ?", (severities.critical, "critical"), fetch=False)
+    db_manager.execute_query("UPDATE log_severities SET event_types = ? WHERE severity = ?", (severities.warning, "warning"), fetch=False)
+    db_manager.execute_query("UPDATE log_severities SET event_types = ? WHERE severity = ?", (severities.info, "info"), fetch=False)
+
+    logger.info("Log severities updated")
     return {"status": "ok"}
 
 # -----------------------------

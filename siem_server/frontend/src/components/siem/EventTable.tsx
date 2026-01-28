@@ -6,16 +6,35 @@ import {
 } from "@tanstack/react-table";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
+import { siemApi } from "@/services/siemApi";
 
 export function EventTable({ data, searchQuery, onSearchChange }) {
   const [sorting, setSorting] = useState([]);
   const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
+  const [severities, setSeverities] = useState({ critical: "", warning: "", info: "" });
 
   // Update local search when prop changes (for external updates)
   useEffect(() => {
     setLocalSearchQuery(searchQuery);
   }, [searchQuery]);
+
+  // Load severities on mount
+  useEffect(() => {
+    const loadSeverities = async () => {
+      try {
+        const sev = await siemApi.getLogSeverities();
+        setSeverities({
+          critical: sev.critical || "",
+          warning: sev.warning || "",
+          info: sev.info || "",
+        });
+      } catch (error) {
+        console.error("Failed to load severities:", error);
+      }
+    };
+    loadSeverities();
+  }, []);
 
   // Debounce local search query to avoid excessive filtering and parent re-renders
   useEffect(() => {
@@ -39,19 +58,23 @@ export function EventTable({ data, searchQuery, onSearchChange }) {
     );
   }, [data, debouncedSearchQuery]);
 
-  const getSeverityVariant = useCallback((eventType) => {
+  const getSeverityConfig = useCallback((eventType) => {
     const type = eventType?.toUpperCase() || "";
-    if (type.includes("ERROR") || type.includes("CRITICAL") || type.includes("FAIL")) {
-      return "destructive";
+    const criticalTypes = severities.critical.split(',').map(t => t.trim().toUpperCase()).filter(t => t);
+    const warningTypes = severities.warning.split(',').map(t => t.trim().toUpperCase()).filter(t => t);
+    const infoTypes = severities.info.split(',').map(t => t.trim().toUpperCase()).filter(t => t);
+
+    if (criticalTypes.some(ct => type.includes(ct))) {
+      return { variant: "destructive" as const };
     }
-    if (type.includes("WARN") || type.includes("WARNING")) {
-      return "secondary";
+    if (warningTypes.some(wt => type.includes(wt))) {
+      return { className: "bg-warning text-warning-foreground" };
     }
-    if (type.includes("AUTH")) {
-      return "outline";
+    if (infoTypes.some(it => type.includes(it))) {
+      return { className: "bg-info text-info-foreground" };
     }
-    return "default";
-  }, []);
+    return { variant: "default" as const };
+  }, [severities]);
 
   const columns = useMemo(() => [
     {
@@ -74,17 +97,24 @@ export function EventTable({ data, searchQuery, onSearchChange }) {
     {
       accessorKey: "event_type",
       header: "Event Type",
-      cell: (info) => (
-        <Badge variant={getSeverityVariant(info.getValue())} className="font-mono">
-          {info.getValue()}
-        </Badge>
-      ),
+      cell: (info) => {
+        const config = getSeverityConfig(info.getValue());
+        const badgeProps: any = { className: `font-mono ${config.className || ""}`.trim() };
+        if (config.variant) {
+          badgeProps.variant = config.variant;
+        }
+        return (
+          <Badge {...badgeProps}>
+            {info.getValue()}
+          </Badge>
+        );
+      },
     },
     {
       accessorKey: "data",
       header: "Message",
     },
-  ], [getSeverityVariant]);
+  ], [getSeverityConfig]);
 
   const table = useReactTable({
     data: filteredData,

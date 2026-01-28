@@ -15,6 +15,11 @@ class DatabaseManager:
         with self.get_connection() as conn:
             cur = conn.cursor()
 
+            # Set PRAGMA settings first (before any transactions)
+            cur.execute("PRAGMA journal_mode=WAL")
+            cur.execute("PRAGMA foreign_keys=ON")
+            cur.execute("PRAGMA synchronous=NORMAL")
+
             # Create logs table with indexes
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS logs (
@@ -37,16 +42,28 @@ class DatabaseManager:
                 )
             """)
 
+            # Create log_severities table for configurable event type severities
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS log_severities (
+                    severity TEXT PRIMARY KEY,
+                    event_types TEXT NOT NULL
+                )
+            """)
+
+            # Insert default severities if not exists
+            cur.execute("""
+                INSERT OR IGNORE INTO log_severities (severity, event_types)
+                VALUES
+                    ('critical', 'ERROR,CRITICAL,FAIL,ACTION_FAILED'),
+                    ('warning', 'WARN,WARNING'),
+                    ('info', 'INFO,AUTH,SUCCESS')
+            """)
+
             # Create indexes for performance
             cur.execute("CREATE INDEX IF NOT EXISTS idx_node_id ON logs(node_id)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_created_at ON logs(created_at)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_event_type ON logs(event_type)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_node_created ON logs(node_id, created_at)")
-
-            # Set WAL mode for better concurrency
-            cur.execute("PRAGMA journal_mode=WAL")
-            cur.execute("PRAGMA foreign_keys=ON")
-            cur.execute("PRAGMA synchronous=NORMAL")
 
             conn.commit()
             logger.info("Database initialized with indexes and WAL mode")

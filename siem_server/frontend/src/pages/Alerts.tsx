@@ -11,8 +11,6 @@ import { Download } from "lucide-react";
 
 import { siemApi, LogsResponse, LogEntry } from "@/services/siemApi";
 
-const isCritical = (eventType: string) => ['ERROR','CRITICAL','FAIL','ACTION_FAILED'].includes(eventType.toUpperCase().trim());
-
 const Alerts = () => {
   // ---------------- States ----------------
   const [nodes, setNodes] = useState<{ node_id: string; online: boolean }[]>([]);
@@ -26,6 +24,14 @@ const Alerts = () => {
   // Filters
   const [startDate, setStartDate] = useState<string>(localStorage.getItem('alerts_startDate') || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]); // 7 days ago
   const [endDate, setEndDate] = useState<string>(localStorage.getItem('alerts_endDate') || new Date().toISOString().split('T')[0]); // today
+
+  const [severities, setSeverities] = useState({ critical: "", warning: "", info: "" });
+
+  const isCritical = useCallback((eventType: string) => {
+    const type = eventType?.toUpperCase().trim() || "";
+    const criticalTypes = severities.critical.split(',').map(t => t.trim().toUpperCase()).filter(t => t);
+    return criticalTypes.some(ct => type.includes(ct));
+  }, [severities]);
 
   // Persist filters
   useEffect(() => {
@@ -87,11 +93,24 @@ const Alerts = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedNode, searchQuery, startDate, endDate]);
+  }, [selectedNode, searchQuery, startDate, endDate, isCritical]);
 
   // ---------------- Effects ----------------
   useEffect(() => {
     loadNodes();
+    const loadSeverities = async () => {
+      try {
+        const sev = await siemApi.getLogSeverities();
+        setSeverities({
+          critical: sev.critical || "",
+          warning: sev.warning || "",
+          info: sev.info || "",
+        });
+      } catch (error) {
+        console.error("Failed to load severities:", error);
+      }
+    };
+    loadSeverities();
   }, [loadNodes]);
 
   useEffect(() => {
@@ -138,7 +157,7 @@ const Alerts = () => {
       console.log(`[WS] Closing WebSocket connection`);
       ws.close();
     };
-  }, [selectedNode, startDate, endDate, loadAlerts]);
+  }, [selectedNode, startDate, endDate, loadAlerts, isCritical]);
 
   // ---------------- Handlers ----------------
   const handleNodeChange = (nodeId: string) => {
