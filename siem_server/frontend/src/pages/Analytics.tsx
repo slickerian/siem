@@ -5,6 +5,7 @@ import { toast } from "@/hooks/use-toast";
 import { StatsCards } from "@/components/siem/StatsCards";
 import { EventChart } from "@/components/siem/EventChart";
 import { EventTypeChart } from "@/components/siem/EventTypeChart";
+import { AnomalyDetection } from "@/components/siem/AnomalyDetection";
 import NetworkTopology from "@/components/siem/NetworkTopology";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -239,6 +240,12 @@ const Analytics = () => {
             </SelectContent>
           </Select>
         </div>
+      </div>
+
+      {/* Network Anomalies */}
+      <div>
+        <h2 className="text-xl font-bold mb-4">🔍 Network Anomalies</h2>
+        <AnomalyDetection />
       </div>
 
       {/* Charts */}

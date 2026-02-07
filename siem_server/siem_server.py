@@ -13,6 +13,8 @@ import logging
 import time
 from database import db_manager
 from collections import defaultdict
+from ai import init_network_anomaly_detector, get_detector
+from ai.endpoints import register_network_anomaly_routes
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -33,7 +35,29 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event():
     logger.info("Starting SIEM server with background cleanup task")
+    
+    # Initialize network anomaly detector
+    anomaly_detector = init_network_anomaly_detector(
+        request_threshold_multiplier=2.5,
+        baseline_window_minutes=30
+    )
+    logger.info("[ANOMALY DETECTOR] Network anomaly detector initialized")
+    logger.info(f"[ANOMALY DETECTOR] Threshold multiplier: 2.5x, Baseline window: 30 minutes")
+    
+    # Register anomaly detection endpoints
+    register_network_anomaly_routes(app)
+    logger.info("[ANOMALY DETECTOR] 6 anomaly detection endpoints registered")
+    
     asyncio.create_task(node_cleanup_task())
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    logger.info("Shutting down SIEM server...")
+    try:
+        get_detector().save_state()
+        logger.info("[ANOMALY DETECTOR] Model state saved successfully")
+    except Exception as e:
+        logger.error(f"[ANOMALY DETECTOR] Failed to save state: {e}")
 
 # Global stats cache to avoid expensive recalculations
 stats_cache = {
@@ -303,6 +327,76 @@ async def ingest_log(log: LogIn):
     total_time = time.time() - start_time
     logger.info(f"Log ingestion completed in {total_time:.4f}s for node {log.node_id}")
     return {"status": "ok"}
+
+# -----------------------------
+# /log/topology - network anomaly detection
+# -----------------------------
+@app.post("/log/topology")
+async def receive_topology(data: dict):
+    """Receive network topology data from siem_node and detect anomalies"""
+    try:
+        detector = get_detector()
+        
+        topology = {
+            "nodes": data.get("nodes", {}),
+            "edges": data.get("edges", {})
+        }
+        
+        result = detector.analyze_topology(topology)
+        
+        # Log anomalies
+        if result['new_nodes']:
+            logger.warning(f"[ANOMALY] NEW NODES detected: {result['new_nodes']}")
+            for ip in result['new_nodes']:
+                node_info = topology['nodes'].get(ip, {})
+                logger.warning(f"  → {ip} ({node_info.get('hostname', 'unknown')}) - MAC: {node_info.get('mac', 'unknown')}")
+        
+        if result['excessive_requests']:
+            logger.warning(f"[ANOMALY] EXCESSIVE REQUESTS detected: {len(result['excessive_requests'])} nodes")
+            for ip, stats in result['excessive_requests'].items():
+                logger.warning(f"  → {ip}: {stats['current']} req (baseline: {stats['baseline']}, multiplier: {stats['multiplier']}x) [{stats['severity']}]")
+        
+        # Broadcast anomalies to WebSocket clients
+        if result['anomalies_summary'] > 0:
+            anomalies = detector.get_anomalies(limit=10)
+            await broadcast({
+                "type": "ANOMALIES_DETECTED",
+                "new_nodes": result['new_nodes'],
+                "excessive_requests": result['excessive_requests'],
+                "anomalies_count": result['anomalies_summary'],
+                "timestamp": result['timestamp'],
+                "recent_anomalies": anomalies[:5]
+            })
+        
+        return {
+            "status": "ok",
+            "new_nodes": result['new_nodes'],
+            "excessive_requests": result['excessive_requests'],
+            "anomalies": result['anomalies_summary']
+        }
+    
+    except Exception as e:
+        logger.error(f"Error processing topology data: {e}")
+        raise HTTPException(status_code=500, detail=f"Topology processing failed: {str(e)}")
+
+# -----------------------------
+# /api/ai/relearn - force AI reset
+# -----------------------------
+@app.post("/api/ai/relearn")
+async def relearn_ai():
+    """Reset the AI model and clear all anomalies"""
+    try:
+        detector = get_detector()
+        detector.relearn()
+        
+        # Save the empty state immediately
+        detector.save_state()
+        
+        logger.info("[AI] Manual relearn triggered by user")
+        return {"status": "ok", "message": "AI model reset and is now in learning mode"}
+    except Exception as e:
+        logger.error(f"Failed to reset AI: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # -----------------------------
 # /ws - realtime updates

@@ -101,10 +101,19 @@ def detect_communication_patterns(devices, logger):
 
         local_ip = conn.laddr.ip
         remote_ip = conn.raddr.ip
+        remote_port = conn.raddr.port
+        
+        # Get process name
+        try:
+            process = psutil.Process(conn.pid).name() if conn.pid else "unknown"
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            process = "unknown"
 
         if local_ip in devices and remote_ip in devices:
-            pair = tuple(sorted((local_ip, remote_ip)))
-            edges[pair] = edges.get(pair, 0) + 1
+            # Key: (Source, Dest, Port, Process)
+            # Use tuple for immutable dict key
+            edge_key = (local_ip, remote_ip, remote_port, process)
+            edges[edge_key] = edges.get(edge_key, 0) + 1
 
     return edges
 
@@ -137,12 +146,16 @@ def discover_devices(logger):
     # Communication patterns (local host perspective)
     edges = detect_communication_patterns(all_devices, logger)
 
-    for pair, count in edges.items():
+    for (src, dst, port, process), count in edges.items():
         logger.log(
             "COMMUNICATION_PATTERN",
-            f"Devices {pair[0]} and {pair[1]} have {count} local connections"
+            f"Devices {src} and {dst} communicate on port {port} via {process} ({count} connections)"
         )
-        all_edges[pair] = count
+        # Flatten key for JSON serialization if needed, or keep as tuple structure that backend parses
+        # But wait, JSON keys must be strings.
+        # Let's standardize the key format: "src|dst|port|process"
+        key = f"{src}|{dst}|{port}|{process}"
+        all_edges[key] = count
 
     return {
         "nodes": all_devices,
