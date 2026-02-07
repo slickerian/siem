@@ -11,6 +11,7 @@ Uses statistical baselines to detect request volume anomalies.
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta
+import os
 from typing import Dict, List, Tuple, Optional
 from .ai import TopologyAnomalyModel
 

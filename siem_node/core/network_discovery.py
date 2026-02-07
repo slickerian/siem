@@ -109,11 +109,22 @@ def detect_communication_patterns(devices, logger):
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             process = "unknown"
 
-        if local_ip in devices and remote_ip in devices:
-            # Key: (Source, Dest, Port, Process)
-            # Use tuple for immutable dict key
-            edge_key = (local_ip, remote_ip, remote_port, process)
-            edges[edge_key] = edges.get(edge_key, 0) + 1
+        # Allow communication with external IPs
+        if local_ip not in devices:
+             # Should not happen if local_ip is one of our interfaces, but just in case
+             pass 
+        
+        # If remote_ip is new (external), add it to devices list so it shows up in graph
+        if remote_ip not in devices:
+            devices[remote_ip] = {
+                "mac": "Unknown (External)",
+                "hostname": f"External ({remote_ip})"
+            }
+
+        # Key: (Source, Dest, Port, Process)
+        # Use tuple for immutable dict key
+        edge_key = (local_ip, remote_ip, remote_port, process)
+        edges[edge_key] = edges.get(edge_key, 0) + 1
 
     return edges
 

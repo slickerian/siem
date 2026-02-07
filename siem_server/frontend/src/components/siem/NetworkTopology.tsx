@@ -60,17 +60,46 @@ const NetworkTopology: React.FC<NetworkTopologyProps> = ({ selectedNode }) => {
             if (match) {
               const ip = match[1].trim();
               const mac = match[2].trim();
-              const hostname = match[3].trim() || null;
+              let hostname = match[3].trim();
+
+              // Handle Python "None" string or empty
+              if (hostname === "None" || hostname === "") {
+                hostname = null;
+              }
+
               devices[ip] = { ip, mac, hostname };
             }
           } else if (log.event_type === 'COMMUNICATION_PATTERN') {
-            // Parse data like "Devices 192.168.1.1 and 192.168.1.2 have 5 local connections"
-            const match = log.data.match(/Devices\s+([^ ]+)\s+and\s+([^ ]+)\s+have\s+(\d+)\s+local connections/);
-            if (match) {
-              const from = match[1];
-              const to = match[2];
-              const count = parseInt(match[3]);
-              edges.push({ from, to, count });
+            // New Format: "Devices 192.168.1.1 and 192.168.1.2 communicate on port 443 via chrome.exe (5 connections)"
+            // Old Format handling for backward compatibility? Maybe not needed if we cleared data.
+            // Let's support the new format primarily.
+
+            // Regex for new format
+            const matchNew = log.data.match(/Devices\s+([^ ]+)\s+and\s+([^ ]+)\s+communicate on port\s+(\d+)\s+via\s+(.+)\s+\((\d+)\s+connections\)/);
+
+            if (matchNew) {
+              const from = matchNew[1];
+              const to = matchNew[2];
+              // We don't display port/process on the edge in basic topology yet, just the link
+              // aggregating counts if multiple ports exist between same nodes
+              const count = parseInt(matchNew[5]);
+
+              // Check if edge already exists to aggregate?
+              const existingEdge = edges.find(e => (e.from === from && e.to === to) || (e.from === to && e.to === from));
+              if (existingEdge) {
+                existingEdge.count += count;
+              } else {
+                edges.push({ from, to, count });
+              }
+            } else {
+              // Fallback to old format
+              const matchOld = log.data.match(/Devices\s+([^ ]+)\s+and\s+([^ ]+)\s+have\s+(\d+)\s+local connections/);
+              if (matchOld) {
+                const from = matchOld[1];
+                const to = matchOld[2];
+                const count = parseInt(matchOld[3]);
+                edges.push({ from, to, count });
+              }
             }
           }
         });
