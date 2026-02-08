@@ -4,12 +4,12 @@ from sklearn.ensemble import IsolationForest
 
 
 class TopologyAnomalyModel:
-    def __init__(self, min_train_samples=100):
+    def __init__(self, min_train_samples=10):
         self.min_train_samples = min_train_samples
 
         # Unsupervised model for connection anomalies
         self.model = IsolationForest(
-            contamination=0.1,
+            contamination=0.2,
             random_state=42
         )
 
@@ -99,7 +99,23 @@ class TopologyAnomalyModel:
         if not self.trained:
             return False
 
+        if not self.trained:
+            return False
+
         prediction = self.model.predict([features])
+        score = self.model.decision_function([features])[0]
+        print(f"[AI DEBUG] Features: {features} -> Prediction: {prediction[0]}, Score: {score:.4f}")
+        
+        # Heuristic Fallback: 
+        # If ML is uncertain (score > -0.1) but count is massive compared to average
+        if score > -0.1 and len(self.training_data) > 0:
+            avg_count = sum(t[4] for t in self.training_data) / len(self.training_data)
+            current_count = count
+            # If count is 10x average and > 100, flag it
+            if current_count > 100 and current_count > avg_count * 10:
+                print(f"[AI DEBUG] Heuristic override: Count {current_count} >> Avg {avg_count}")
+                return True
+
         return prediction[0] == -1
     # -----------------------------
     # PERSISTENCE

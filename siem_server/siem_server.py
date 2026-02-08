@@ -295,6 +295,16 @@ async def ingest_log(log: LogIn):
         )
         logger.debug(f"Log inserted successfully for node {log.node_id}")
 
+        # --- AI INTEGRATION ---
+        # Feed communication logs to anomaly detector in real-time
+        if log.event_type == "COMMUNICATION_PATTERN":
+            try:
+                detector = get_detector()
+                detector.process_log_entry(log.event_type, log.data)
+            except Exception as e:
+                logger.error(f"AI Processing failed: {e}")
+        # ----------------------
+
         # Invalidate cache when new log is added
         global stats_cache
         stats_cache['last_updated'] = None

@@ -65,7 +65,7 @@ export const AnomalyDetection = () => {
 
       // Calculate stats
       const newNodesCount = data.filter((a) => a.type === "NEW_NODE").length;
-      const excessiveCount = data.filter((a) => a.type === "EXCESSIVE_REQUESTS").length;
+      const excessiveCount = data.filter((a) => a.type === "EXCESSIVE_REQUESTS" || a.type === "ML_ANOMALY").length;
 
       setStats({
         total: data.length,
@@ -75,6 +75,11 @@ export const AnomalyDetection = () => {
       console.log("[ANOMALY] Stats updated - Total:", data.length, "New Nodes:", newNodesCount, "Excessive:", excessiveCount);
     } catch (error) {
       console.error("[ANOMALY] Failed to fetch anomalies:", error);
+      toast({
+        title: "Connection Error",
+        description: "Could not fetch network anomalies. Check if backend is running.",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
@@ -195,7 +200,7 @@ export const AnomalyDetection = () => {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-orange-600">{stats.excessive_requests}</div>
-            <p className="text-xs text-muted-foreground mt-1">Traffic spikes detected</p>
+            <p className="text-xs text-muted-foreground mt-1">Traffic spikes & AI patterns</p>
           </CardContent>
         </Card>
       </div>

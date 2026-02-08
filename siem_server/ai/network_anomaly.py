@@ -15,6 +15,7 @@ import os
 from typing import Dict, List, Tuple, Optional
 from .ai import TopologyAnomalyModel
 
+import re
 
 class NetworkAnomalyDetector:
     """
@@ -24,6 +25,9 @@ class NetworkAnomalyDetector:
     - New devices appearing in the network (new nodes)
     - Nodes with excessive request counts (communication spikes)
     """
+    
+    # Regex for parsing COMMUNICATION_PATTERN logs
+    LOG_PATTERN = re.compile(r"Devices\s+([^\s]+)\s+and\s+([^\s]+)(?:\s*\((\d+)\s+connections\))?(?:\s*\[Port:\s*(\d+|None)\s*\|\s*Process:\s*([^\]]+)\])?")
     
     def __init__(self, request_threshold_multiplier: float = 2.5, 
                  baseline_window_minutes: int = 30):
@@ -47,17 +51,57 @@ class NetworkAnomalyDetector:
 
         # ML Model (Persistent)
         self.ml_model = TopologyAnomalyModel()
-        self.model_path = os.path.join("models", "ai_model.pkl")
+        # Determine absolute path to models directory (siem_server/models)
+        current_dir = os.path.dirname(os.path.abspath(__file__)) # siem_server/ai
+        server_dir = os.path.dirname(current_dir) # siem_server
+        self.models_dir = os.path.join(server_dir, "models")
+        
+        self.model_path = os.path.join(self.models_dir, "ai_model.pkl")
+        self.state_path = os.path.join(self.models_dir, "detector_state.pkl")
         
         # Ensure models directory exists
-        os.makedirs("models", exist_ok=True)
+        os.makedirs(self.models_dir, exist_ok=True)
         
         try:
-            self.ml_model.load_model(self.model_path)
+            self.load_state()
         except Exception as e:
-            print(f"[AI] Warning: Could not load ML model: {e}")
-    
-    # ==============================
+            print(f"[AI] Warning: Could not load AI state: {e}")
+
+    def process_log_entry(self, event_type: str, data: str):
+        """
+        Process a single log entry for anomaly detection.
+        Called by siem_server.py ingest_log().
+        """
+        if event_type == "COMMUNICATION_PATTERN":
+            # DEBUG
+            print(f"[AI DEBUG] Processing log: {data}")
+            match = self.LOG_PATTERN.match(data)
+            if match:
+                print(f"[AI DEBUG] Match found: {match.groups()}")
+                ip1, ip2, count_str, port_str, process = match.groups()
+                
+                count = int(count_str) if count_str else 1
+                port = int(port_str) if port_str and port_str != 'None' else 0
+                process = process.strip() if process else "unknown"
+
+                # Feed to ML Model
+                # Check connection (ip1 -> ip2)
+                is_anomalous = self.ml_model.observe_connection(ip1, ip2, port, process, count)
+                
+                # If anomalous, log it
+                if is_anomalous: # Isolation Forest flagged this pattern
+                    timestamp = time.time()
+                    self.anomalies.append({
+                        "type": "ML_ANOMALY",
+                        "timestamp": timestamp,
+                        "node_ip": ip1, # Source
+                        "dst_ip": ip2,
+                        "port": port,
+                        "process": process,
+                        "severity": "HIGH",
+                        "details": "Unusual communication pattern detected by AI"
+                    })
+                    print(f"[AI] ANOMALY DETECTED: {ip1} -> {ip2} (Port: {port}, Proc: {process})")
     # DEVICE ANOMALY DETECTION
     # ==============================
     
@@ -306,9 +350,43 @@ class NetworkAnomalyDetector:
         self.anomalies = []
         
     def save_state(self):
-        """Save ML model state"""
+        """Save AI state (model + anomalies)"""
+        import pickle
+        try:
+            state = {
+                "anomalies": self.anomalies,
+                "known_devices": self.known_devices,
+                "request_history": self.request_history
+            }
+            # Save detector state
+            with open(self.state_path, "wb") as f:
+                pickle.dump(state, f)
+            
+            # Save ML model separately (it handles its own persistence)
+            if self.ml_model:
+                self.ml_model.save_model(self.model_path)
+                
+            print(f"[AI] State saved successfully")
+        except Exception as e:
+            print(f"[AI] Failed to save state: {e}")
+
+    def load_state(self):
+        """Load AI state"""
+        import pickle
+        if os.path.exists(self.state_path):
+            try:
+                with open(self.state_path, "rb") as f:
+                    state = pickle.load(f)
+                    self.anomalies = state.get("anomalies", [])
+                    self.known_devices = state.get("known_devices", {})
+                    self.request_history = state.get("request_history", defaultdict(list))
+                print(f"[AI] Detector state loaded ({len(self.anomalies)} anomalies)")
+            except Exception as e:
+                print(f"[AI] Failed to load detector state: {e}")
+
+        # Load ML model
         if self.ml_model:
-            self.ml_model.save_model(self.model_path)
+            self.ml_model.load_model(self.model_path)
 
     def relearn(self):
         """Force AI to relearn from scratch"""
