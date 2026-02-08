@@ -81,3 +81,5 @@ dist-ssr
 
 # Frontend package files (User requested exclusion)
 
+siem_server/frontend/package-lock.json
+siem_server/frontend/package.json

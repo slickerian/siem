@@ -81,7 +81,7 @@ def start(logger, interval=2):
     def discovery_loop():
         while True:
             perform_network_discovery(logger)
-            time.sleep(300)
+            time.sleep(20)
 
     discovery_thread = threading.Thread(target=discovery_loop, daemon=True)
     discovery_thread.start()

@@ -6,7 +6,7 @@ import { StatsCards } from "@/components/siem/StatsCards";
 import { EventChart } from "@/components/siem/EventChart";
 import { EventTypeChart } from "@/components/siem/EventTypeChart";
 import { AnomalyDetection } from "@/components/siem/AnomalyDetection";
-import NetworkTopology from "@/components/siem/NetworkTopology";
+import NetworkMap from "@/components/siem/NetworkMap";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -198,9 +198,8 @@ const Analytics = () => {
               {nodes.map((node) => (
                 <SelectItem key={node.node_id} value={node.node_id}>
                   {node.node_id}
-                  <span className={`ml-2 inline-block w-2 h-2 rounded-full ${
-                    node.online ? 'bg-green-500' : 'bg-red-500'
-                  }`} />
+                  <span className={`ml-2 inline-block w-2 h-2 rounded-full ${node.online ? 'bg-green-500' : 'bg-red-500'
+                    }`} />
                 </SelectItem>
               ))}
             </SelectContent>
@@ -256,8 +255,14 @@ const Analytics = () => {
             <EventTypeChart data={stats.histogram || []} />
           </div>
 
-          {/* Network Topology */}
-          <NetworkTopology selectedNode={selectedNode} />
+
+          {/* Network Graph */}
+          <div className="bg-card rounded-xl border border-border p-6 shadow-sm mb-6">
+            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+              Network Map
+            </h2>
+            <NetworkMap selectedNode={selectedNode} />
+          </div>
 
           {/* Additional Analytics */}
           <div className="space-y-4">

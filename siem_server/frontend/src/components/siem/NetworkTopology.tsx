@@ -70,34 +70,23 @@ const NetworkTopology: React.FC<NetworkTopologyProps> = ({ selectedNode }) => {
               devices[ip] = { ip, mac, hostname };
             }
           } else if (log.event_type === 'COMMUNICATION_PATTERN') {
-            // New Format: "Devices 192.168.1.1 and 192.168.1.2 communicate on port 443 via chrome.exe (5 connections)"
-            // Old Format handling for backward compatibility? Maybe not needed if we cleared data.
-            // Let's support the new format primarily.
+            // Robust parsing: Just look for "Devices X and Y" at the start
+            // We can optionally parse the rest, but the core requirement is the link.
+            const matchSimple = log.data.match(/Devices\s+([^\s]+)\s+and\s+([^\s]+)/);
 
-            // Regex for new format
-            const matchNew = log.data.match(/Devices\s+([^ ]+)\s+and\s+([^ ]+)\s+communicate on port\s+(\d+)\s+via\s+(.+)\s+\((\d+)\s+connections\)/);
+            if (matchSimple) {
+              const from = matchSimple[1];
+              const to = matchSimple[2];
 
-            if (matchNew) {
-              const from = matchNew[1];
-              const to = matchNew[2];
-              // We don't display port/process on the edge in basic topology yet, just the link
-              // aggregating counts if multiple ports exist between same nodes
-              const count = parseInt(matchNew[5]);
+              // Try to extract count if available, otherwise default to 1
+              const countMatch = log.data.match(/\((\d+)\s+connections\)/);
+              const count = countMatch ? parseInt(countMatch[1]) : 1;
 
-              // Check if edge already exists to aggregate?
+              // Check existing edge
               const existingEdge = edges.find(e => (e.from === from && e.to === to) || (e.from === to && e.to === from));
               if (existingEdge) {
                 existingEdge.count += count;
               } else {
-                edges.push({ from, to, count });
-              }
-            } else {
-              // Fallback to old format
-              const matchOld = log.data.match(/Devices\s+([^ ]+)\s+and\s+([^ ]+)\s+have\s+(\d+)\s+local connections/);
-              if (matchOld) {
-                const from = matchOld[1];
-                const to = matchOld[2];
-                const count = parseInt(matchOld[3]);
                 edges.push({ from, to, count });
               }
             }
@@ -141,18 +130,38 @@ const NetworkTopology: React.FC<NetworkTopologyProps> = ({ selectedNode }) => {
 
     const data = { nodes, edges };
     const options = {
-      physics: {
-        enabled: true,
+      nodes: {
+        font: {
+          size: 14,
+          face: 'Inter',
+        },
+        borderWidth: 2,
+        shadow: true,
       },
       edges: {
+        width: 2,
+        color: { color: '#64748b', highlight: '#3b82f6' },
+        arrows: 'to',
         smooth: {
           enabled: true,
           type: 'continuous',
-          roundness: 0.5,
+          roundness: 0.4,
+        },
+      },
+      physics: {
+        enabled: true,
+        barnesHut: {
+          gravitationalConstant: -2000,
+          springConstant: 0.04,
+          springLength: 200,
+        },
+        stabilization: {
+          iterations: 200,
         },
       },
       interaction: {
         hover: true,
+        tooltipDelay: 200,
         selectConnectedEdges: false,
       },
     };
