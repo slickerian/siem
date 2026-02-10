@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertTriangle, Zap, RefreshCw } from "lucide-react";
+import { AlertTriangle, Zap, RefreshCw, Skull } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
@@ -27,7 +27,9 @@ interface AnomalyStats {
   total: number;
   new_nodes: number;
   excessive_requests: number;
+  rogue_devices: number;
 }
+
 
 export const AnomalyDetection = () => {
   const { toast } = useToast();
@@ -36,6 +38,7 @@ export const AnomalyDetection = () => {
     total: 0,
     new_nodes: 0,
     excessive_requests: 0,
+    rogue_devices: 0,
   });
   const [loading, setLoading] = useState(false);
   const [relearning, setRelearning] = useState(false);
@@ -66,11 +69,13 @@ export const AnomalyDetection = () => {
       // Calculate stats
       const newNodesCount = data.filter((a) => a.type === "NEW_NODE").length;
       const excessiveCount = data.filter((a) => a.type === "EXCESSIVE_REQUESTS" || a.type === "ML_ANOMALY").length;
+      const rogueCount = data.filter((a) => a.type === "ROGUE_DEVICE").length;
 
       setStats({
         total: data.length,
         new_nodes: newNodesCount,
         excessive_requests: excessiveCount,
+        rogue_devices: rogueCount,
       });
       console.log("[ANOMALY] Stats updated - Total:", data.length, "New Nodes:", newNodesCount, "Excessive:", excessiveCount);
     } catch (error) {
@@ -101,7 +106,7 @@ export const AnomalyDetection = () => {
 
       // Clear local state immediately
       setAnomalies([]);
-      setStats({ total: 0, new_nodes: 0, excessive_requests: 0 });
+      setStats({ total: 0, new_nodes: 0, excessive_requests: 0, rogue_devices: 0 });
       fetchAnomalies(); // Verify with backend
 
     } catch (error) {
@@ -165,7 +170,7 @@ export const AnomalyDetection = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -175,6 +180,22 @@ export const AnomalyDetection = () => {
           <CardContent>
             <div className="text-3xl font-bold text-foreground">{stats.total}</div>
             <p className="text-xs text-muted-foreground mt-1">Last 24 hours</p>
+          </CardContent>
+        </Card>
+
+        {/* ROGUE DEVICE CARD */}
+        <Card className={stats.rogue_devices > 0 ? "border-red-500 bg-red-950/10" : ""}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              Rogue Devices
+              {stats.rogue_devices > 0 && <Skull className="h-4 w-4 text-red-500 animate-pulse" />}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className={`text-3xl font-bold ${stats.rogue_devices > 0 ? "text-red-500" : "text-foreground"}`}>
+              {stats.rogue_devices}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Unauthorized Infrastructure</p>
           </CardContent>
         </Card>
 
@@ -237,14 +258,22 @@ export const AnomalyDetection = () => {
                     <div className="flex-1">
                       {/* Header: Type & IP */}
                       <div className="flex items-center gap-2 mb-2">
-                        {anomaly.type === "NEW_NODE" ? (
-                          <AlertTriangle className="h-4 w-4 text-blue-600" />
+                        {anomaly.type === "ROGUE_DEVICE" ? (
+                          <div className="flex items-center gap-2">
+                            <Skull className="h-4 w-4 text-red-600" />
+                            <span className="font-semibold text-red-600">🏴‍☠️ Rogue Device Detected</span>
+                          </div>
+                        ) : anomaly.type === "NEW_NODE" ? (
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className="h-4 w-4 text-blue-600" />
+                            <span className="font-semibold text-foreground">🆕 New Node</span>
+                          </div>
                         ) : (
-                          <Zap className="h-4 w-4 text-orange-600" />
+                          <div className="flex items-center gap-2">
+                            <Zap className="h-4 w-4 text-orange-600" />
+                            <span className="font-semibold text-foreground">⚡ Traffic Spike</span>
+                          </div>
                         )}
-                        <span className="font-semibold text-foreground">
-                          {anomaly.type === "NEW_NODE" ? "🆕 New Node" : "⚡ Traffic Spike"}
-                        </span>
                         <Badge className={getSeverityColor(anomaly.severity)}>
                           {anomaly.severity}
                         </Badge>
@@ -254,7 +283,12 @@ export const AnomalyDetection = () => {
                       <div className="ml-6 space-y-1 text-sm">
                         <p className="font-mono text-foreground">{anomaly.node_ip}</p>
 
-                        {anomaly.type === "NEW_NODE" ? (
+                        {anomaly.type === "ROGUE_DEVICE" ? (
+                          <p className="text-red-400 font-semibold">
+                            {/* Default to something if details missing, but details should be there */}
+                            {(anomaly as any).details || "Unauthorized device behavior detected"}
+                          </p>
+                        ) : anomaly.type === "NEW_NODE" ? (
                           <>
                             {anomaly.hostname && (
                               <p className="text-muted-foreground">

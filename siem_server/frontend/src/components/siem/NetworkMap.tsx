@@ -69,6 +69,7 @@ const NetworkMap: React.FC<NetworkMapProps> = ({ selectedNode }) => {
     const [nodes, setNodes, onNodesChange] = useNodesState([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     const onConnect = useCallback(
         (params: Connection) => setEdges((eds) => addEdge(params, eds)),
@@ -79,7 +80,7 @@ const NetworkMap: React.FC<NetworkMapProps> = ({ selectedNode }) => {
         if (!selectedNode) return;
 
         const fetchNetworkData = async () => {
-            setIsLoading(true);
+            if (nodes.length === 0) setIsLoading(true); // Only show loader on first load
             try {
                 const logs = await siemApi.getLogs({
                     node_id: selectedNode,
@@ -94,6 +95,14 @@ const NetworkMap: React.FC<NetworkMapProps> = ({ selectedNode }) => {
                 });
 
                 const allLogs = [...logs.items, ...patternLogs.items];
+
+                // Fetch Anomalies to identify ROGUE DEVICES
+                const anomalies = await siemApi.getAnomalies(50);
+                const rogueIps = new Set(
+                    anomalies
+                        .filter((a: any) => a.type === 'ROGUE_DEVICE')
+                        .map((a: any) => a.node_id || a.node_ip)
+                );
 
                 // 1. Process Nodes
                 const deviceMap: Record<string, any> = {};
@@ -114,7 +123,16 @@ const NetworkMap: React.FC<NetworkMapProps> = ({ selectedNode }) => {
                             if (ip.endsWith('.1') || ip.endsWith('.254')) type = 'gateway';
                             if (hostname.includes('External')) type = 'external';
 
-                            deviceMap[ip] = { ip, mac, hostname, type };
+                            if (ip.endsWith('.1') || ip.endsWith('.254')) type = 'gateway';
+                            if (hostname.includes('External')) type = 'external';
+
+                            deviceMap[ip] = {
+                                ip,
+                                mac,
+                                hostname,
+                                type,
+                                isRogue: rogueIps.has(ip)
+                            };
                         }
                     }
                 });
@@ -132,8 +150,8 @@ const NetworkMap: React.FC<NetworkMapProps> = ({ selectedNode }) => {
                             const to = matchSimple[2];
 
                             // Ensure both nodes exist (add simplified nodes if missing)
-                            if (!deviceMap[from]) deviceMap[from] = { ip: from, mac: "Unknown", hostname: from, type: 'external' };
-                            if (!deviceMap[to]) deviceMap[to] = { ip: to, mac: "Unknown", hostname: to, type: 'external' };
+                            if (!deviceMap[from]) deviceMap[from] = { ip: from, mac: "Unknown", hostname: from, type: 'external', isRogue: rogueIps.has(from) };
+                            if (!deviceMap[to]) deviceMap[to] = { ip: to, mac: "Unknown", hostname: to, type: 'external', isRogue: rogueIps.has(to) };
 
                             const edgeId = `e-${from}-${to}`;
                             if (!edgesSet.has(edgeId)) {
@@ -183,6 +201,7 @@ const NetworkMap: React.FC<NetworkMapProps> = ({ selectedNode }) => {
                         ip: dev.ip,
                         mac: dev.mac,
                         type: dev.type,
+                        isRogue: dev.isRogue,
                     },
                     position: { x: 0, y: 0 }, // Layout will fix this
                 }));
@@ -200,7 +219,15 @@ const NetworkMap: React.FC<NetworkMapProps> = ({ selectedNode }) => {
         };
 
         fetchNetworkData();
-    }, [selectedNode, setNodes, setEdges]);
+    }, [selectedNode, setNodes, setEdges, refreshTrigger]);
+
+    // Auto-refresh map every 5 seconds
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setRefreshTrigger((prev) => prev + 1);
+        }, 5000);
+        return () => clearInterval(interval);
+    }, []);
 
 
     if (isLoading) {

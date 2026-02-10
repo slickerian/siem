@@ -53,6 +53,32 @@ def run_demo():
         
     print("\n--------------------------------")
     print("Check your dashboard now! You should see 'Traffic spikes & AI patterns' count increment.")
+    
+    # Phase 3: Rogue Device Scanning
+    print("\n[Phase 3] 🕵️‍♂️ ROGUE DEVICE INTRUSION 🕵️‍♂️")
+    print("   (Wait 2 seconds...)")
+    time.sleep(2)
+    
+    rogue_ip = "192.168.1.200"
+    print(f"Injecting Rogue Device {rogue_ip} scanning network...")
+    
+    # Simulate scanning 30 internal IPs
+    for i in range(30):
+        target_ip = f"192.168.1.{50+i}"
+        # Rogue behavior: Single packets to many hosts (Scanning)
+        log = f"Devices {rogue_ip} and {target_ip} (1 connections) [Port: 445 | Process: nmap.exe]"
+        
+        send_log(log)
+        if i % 5 == 0:
+            print(f"  -> Scanning {target_ip}...")
+        time.sleep(0.05)
+        
+    print(f"🔥 ROGUE ATTACK COMPLETE: {rogue_ip} scanned 30 hosts!")
+    print("\n--------------------------------")
+    print("DASHBOARD CHECK:")
+    print("1. 'Rogue Devices' card should be RED.")
+    print("2. New 'Rogue Device Detected' alert in list.")
+    print("3. Map should show 192.168.1.200 pulsing RED with star pattern.")
 
 if __name__ == "__main__":
     run_demo()

@@ -99,6 +99,10 @@ export const siemApi = {
     return apiRequest<StatsResponse>(`/api/stats${query ? `?${query}` : ''}`);
   },
 
+  async getAnomalies(limit: number = 20): Promise<any[]> {
+    return apiRequest<any[]>(`/api/anomalies/report?limit=${limit}`);
+  },
+
   async getNodes(): Promise<NodeStatus[]> {
     return apiRequest<NodeStatus[]>('/api/nodes');
   },

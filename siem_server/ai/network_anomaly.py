@@ -46,6 +46,9 @@ class NetworkAnomalyDetector:
         # Keeps rolling window of request counts for baseline calculation
         self.request_history = defaultdict(list)
         
+        # Current edges for real-time rogue detection (src|dst -> count)
+        self.current_edges = {}
+        
         # Anomaly log for audit trail
         self.anomalies = []
 
@@ -102,6 +105,54 @@ class NetworkAnomalyDetector:
                         "details": "Unusual communication pattern detected by AI"
                     })
                     print(f"[AI] ANOMALY DETECTED: {ip1} -> {ip2} (Port: {port}, Proc: {process})")
+
+                # Track edges for Rogue Device Detection (Real-time)
+                # Store as "src|dst" -> count
+                edge_key = f"{ip1}|{ip2}"
+                self.current_edges[edge_key] = self.current_edges.get(edge_key, 0) + count
+                
+                # Periodically check for rogue devices (every 50 logs or so to avoid perf hit?)
+                # actually, simpler to just check this specific IP's connections now
+                self._check_rogue_node(ip1)
+    
+    def _check_rogue_node(self, src_ip: str):
+        """
+        Check if a specific node is behaving like a rogue device.
+        Called incrementally as logs come in.
+        """
+        # Count distinct internal destinations
+        destinations = set()
+        for edge_key in self.current_edges:
+            if edge_key.startswith(f"{src_ip}|"):
+                parts = edge_key.split("|")
+                if len(parts) >= 2:
+                    dst = parts[1]
+                    if dst.startswith("192.168."):
+                        destinations.add(dst)
+        
+        # Heuristic: > 20 distinct internal IPs
+        if len(destinations) > 20:
+             # Ignore Gateway/Router (usually .1)
+            if src_ip.endswith(".1"): 
+                return
+
+            # Check if already logged recently
+            current_time = time.time()
+            already_logged = any(
+                a["type"] == "ROGUE_DEVICE" and a["node_ip"] == src_ip and (current_time - a["timestamp"] < 60)
+                for a in self.anomalies
+            )
+            
+            if not already_logged:
+                self.anomalies.append({
+                    "type": "ROGUE_DEVICE",
+                    "timestamp": current_time,
+                    "node_ip": src_ip,
+                    "details": f"Role Mismatch: Acting like a switch (connected to {len(destinations)} devices)",
+                    "severity": "CRITICAL"
+                })
+                print(f"[AI] ROGUE DEVICE DETECTED: {src_ip} (Scanning {len(destinations)} IPs)")
+
     # DEVICE ANOMALY DETECTION
     # ==============================
     
@@ -239,6 +290,62 @@ class NetworkAnomalyDetector:
         
         return anomalies
     
+    # ==============================
+    # ROGUE DEVICE DETECTION
+    # ==============================
+    
+    def detect_rogue_devices(self, edges: Dict[str, int]) -> List[dict]:
+        """
+        Detect devices behaving like infrastructure (Scanning/Switching).
+        Rule: Node connecting to > 20 distinct internal IPs.
+        """
+        current_time = time.time()
+        rogue_devices = []
+        
+        # Count distinct destinations per source
+        node_connections = defaultdict(set)
+        
+        for edge_str, _ in edges.items():
+            if "|" in edge_str:
+                parts = edge_str.split("|")
+                if len(parts) >= 2:
+                    src, dst = parts[0], parts[1]
+                    # Only count internal-to-internal connections
+                    if src.startswith("192.168.") and dst.startswith("192.168."):
+                        node_connections[src].add(dst)
+        
+        # Analyze
+        for src, destinations in node_connections.items():
+            # WHITELIST: Ignore Gateway/Router (usually .1)
+            if src.endswith(".1"): 
+                continue
+                
+            if len(destinations) > 20:
+                # This is suspicious for a normal laptop
+                rogue_devices.append({
+                    "ip": src,
+                    "distinct_connections": len(destinations),
+                    "severity": "CRITICAL"
+                })
+                
+                # Check if already logged recently (to avoid spam)
+                already_logged = any(
+                    a["type"] == "ROGUE_DEVICE" and a["node_ip"] == src and (current_time - a["timestamp"] < 60)
+                    for a in self.anomalies
+                )
+                
+                if not already_logged:
+                    self.anomalies.append({
+                        "type": "ROGUE_DEVICE",
+                        "timestamp": current_time,
+                        "node_ip": src,
+                        "details": f"Role Mismatch: Acting like a switch (connected to {len(destinations)} devices)",
+                        "severity": "CRITICAL"
+                    })
+                    print(f"[AI] ROGUE DEVICE DETECTED: {src} (Scanning {len(destinations)} IPs)")
+                    
+        return rogue_devices
+
     def _calculate_severity(self, multiplier: float) -> str:
         """
         Calculate severity level based on how much requests exceed baseline.
@@ -276,6 +383,7 @@ class NetworkAnomalyDetector:
         """
         new_nodes = self.detect_new_nodes(topology_data.get("nodes", {}))
         excessive = self.observe_communication(topology_data.get("edges", {}))
+        rogue_devices = self.detect_rogue_devices(topology_data.get("edges", {}))
         
         # ML Analysis: Check every connection edge
         ml_anomalies = []
@@ -321,7 +429,8 @@ class NetworkAnomalyDetector:
             "new_nodes": new_nodes,
             "excessive_requests": excessive,
             "ml_anomalies": ml_anomalies,
-            "anomalies_summary": len(new_nodes) + len(excessive) + len(ml_anomalies),
+            "rogue_devices": rogue_devices,
+            "anomalies_summary": len(new_nodes) + len(excessive) + len(ml_anomalies) + len(rogue_devices),
             "timestamp": time.time()
         }
     

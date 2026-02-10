@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
-import { Monitor, Server, Cloud, Smartphone, HelpCircle, Router } from 'lucide-react';
+import { Monitor, Server, Cloud, Smartphone, HelpCircle, Router, Skull } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
@@ -9,6 +9,7 @@ interface CustomNodeData {
     type: string;
     ip: string;
     mac: string;
+    isRogue?: boolean;
 }
 
 // React Flow passes data inside the `data` prop
@@ -20,7 +21,12 @@ const CustomNode = ({ data, selected }: NodeProps<any>) => {
     let borderClass = "border-border";
     let iconColor = "text-foreground";
 
-    if (data.type === 'gateway') {
+    if (data.isRogue) {
+        Icon = Skull;
+        bgClass = "bg-red-950/40";
+        borderClass = "border-red-500 animate-pulse ring-4 ring-red-500/20";
+        iconColor = "text-red-500";
+    } else if (data.type === 'gateway') {
         Icon = Router;
         bgClass = "bg-blue-950/20";
         borderClass = "border-blue-500/50";

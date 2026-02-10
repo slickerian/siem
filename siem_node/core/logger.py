@@ -14,8 +14,8 @@ KEY_FILE = os.path.join(LOG_DIR, "logging_key.bin")
 
 # ✅ Server endpoint and API key (configurable via env vars)
 import os
-SERVER_URL = os.getenv("SIEM_SERVER_URL", "http://100.112.215.109:8000/log")
-SETTINGS_URL = os.getenv("SIEM_SETTINGS_URL", "http://100.112.215.109:8000/api/nodes/{}/settings")
+SERVER_URL = os.getenv("SIEM_SERVER_URL", "http://100.119.19.5:8000/log")
+SETTINGS_URL = os.getenv("SIEM_SETTINGS_URL", "http://100.119.19.5:8000/api/nodes/{}/settings")
 API_KEY = os.getenv("SIEM_API_KEY", "secretkey")  # must match server config
 
 # Each node identifies itself

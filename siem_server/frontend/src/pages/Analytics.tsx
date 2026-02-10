@@ -28,7 +28,7 @@ const Analytics = () => {
   // Filters
   const [startDate, setStartDate] = useState<string>(localStorage.getItem('analytics_startDate') || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]); // 7 days ago
   const [endDate, setEndDate] = useState<string>(localStorage.getItem('analytics_endDate') || new Date().toISOString().split('T')[0]); // today
-  const [bucketMinutes, setBucketMinutes] = useState<number>(parseInt(localStorage.getItem('analytics_bucketMinutes') || '60')); // 1 hour buckets
+
 
   // Persist filters
   useEffect(() => {
@@ -43,9 +43,7 @@ const Analytics = () => {
     localStorage.setItem('analytics_endDate', endDate);
   }, [endDate]);
 
-  useEffect(() => {
-    localStorage.setItem('analytics_bucketMinutes', bucketMinutes.toString());
-  }, [bucketMinutes]);
+
 
   // Load Nodes
   const loadNodes = useCallback(async () => {
@@ -68,7 +66,7 @@ const Analytics = () => {
         node_id: selectedNode,
         start: new Date(startDate + 'T00:00:00').toISOString(), // start of day
         end: new Date(endDate + 'T23:59:59').toISOString(), // end of day
-        bucket_minutes: bucketMinutes,
+        bucket_minutes: 60,
       };
       const statsResponse = await siemApi.getStats(params);
       setStats(statsResponse);
@@ -85,7 +83,8 @@ const Analytics = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedNode, startDate, endDate, bucketMinutes]);
+
+  }, [selectedNode, startDate, endDate]);
 
   // Effects
   useEffect(() => {
@@ -226,20 +225,8 @@ const Analytics = () => {
           />
         </div>
 
-        <div>
-          <Label htmlFor="bucket">Bucket Size</Label>
-          <Select value={bucketMinutes.toString()} onValueChange={(v) => setBucketMinutes(parseInt(v))}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="15">15 minutes</SelectItem>
-              <SelectItem value="60">1 hour</SelectItem>
-              <SelectItem value="1440">1 day</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
       </div>
+
 
       {/* Network Anomalies */}
       <div>
@@ -248,37 +235,39 @@ const Analytics = () => {
       </div>
 
       {/* Charts */}
-      {stats && (
-        <>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <EventChart data={chartData} />
-            <EventTypeChart data={stats.histogram || []} />
-          </div>
-
-
-          {/* Network Graph */}
-          <div className="bg-card rounded-xl border border-border p-6 shadow-sm mb-6">
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              Network Map
-            </h2>
-            <NetworkMap selectedNode={selectedNode} />
-          </div>
-
-          {/* Additional Analytics */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Event Distribution</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {stats.histogram.map((item) => (
-                <div key={item.event_type} className="p-4 border rounded-lg bg-card">
-                  <div className="text-sm font-medium">{item.event_type}</div>
-                  <div className="text-2xl font-bold">{item.count}</div>
-                </div>
-              ))}
+      {
+        stats && (
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <EventChart data={chartData} />
+              <EventTypeChart data={stats.histogram || []} />
             </div>
-          </div>
-        </>
-      )}
-    </div>
+
+
+            {/* Network Graph */}
+            <div className="bg-card rounded-xl border border-border p-6 shadow-sm mb-6">
+              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                Network Map
+              </h2>
+              <NetworkMap selectedNode={selectedNode} />
+            </div>
+
+            {/* Additional Analytics */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Event Distribution</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {stats.histogram.map((item) => (
+                  <div key={item.event_type} className="p-4 border rounded-lg bg-card">
+                    <div className="text-sm font-medium">{item.event_type}</div>
+                    <div className="text-2xl font-bold">{item.count}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )
+      }
+    </div >
   );
 };
 
