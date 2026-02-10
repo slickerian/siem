@@ -134,15 +134,13 @@ export const AnomalyDetection = () => {
   const getSeverityBgColor = (severity: string) => {
     switch (severity) {
       case "CRITICAL":
-        return "bg-red-50 border-red-200";
+        return "bg-card border-red-500/50 hover:bg-red-500/10";
       case "HIGH":
-        return "bg-orange-50 border-orange-200";
+        return "bg-card border-orange-500/50 hover:bg-orange-500/10";
       case "MEDIUM":
-        return "bg-yellow-50 border-yellow-200";
-      case "LOW":
-        return "bg-blue-50 border-blue-200";
+        return "bg-card border-yellow-500/50 hover:bg-yellow-500/10";
       default:
-        return "bg-gray-50 border-gray-200";
+        return "bg-card border-border hover:bg-accent/50";
     }
   };
 
